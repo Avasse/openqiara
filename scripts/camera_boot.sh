@@ -265,17 +265,23 @@ fi
                 echo "[watchdog] stopped $svc at $(date -Iseconds)" >> /data/openqiarad.log
             fi
         done
+        # openqiarad + hlcamd are launched with `>>` (O_APPEND), so a
+        # truncate-in-place makes the next write land at the new EOF.
+        # 2M cap each leaves headroom on the 16M /data for everything else.
         for f in /data/openqiarad.log /data/hlcamd.log; do
             [ -f "$f" ] || continue
             sz=$(wc -c < "$f" 2>/dev/null || echo 0)
-            if [ "$sz" -gt 4194304 ]; then
-                # Truncate in place (no rename): the daemon was launched
-                # with `>>` so O_APPEND forces every write to go to the
-                # current EOF after this. A `mv` would leave the daemon
-                # writing into the now-renamed inode, which defeats the
-                # whole point.
+            if [ "$sz" -gt 2097152 ]; then
                 : > "$f"
             fi
         done
+        # boot_debug.log (native SIGHUP flood) and fbxhome.log are NOT ours
+        # and their writers keep a raw fd on the inode: verified 2026-09-13
+        # that after `mv` they keep appending to the renamed file at the old
+        # offset, and after truncate they punch a sparse hole. NEITHER is
+        # safe at runtime, so we leave them to the boot-time rotate_log pass
+        # (their writers get a fresh fd only at boot). We just kill the *.old
+        # they leave behind, which is dead weight that alone can fill /data.
+        rm -f /data/boot_debug.log.old /data/fbxhome.log.old /data/dnsmasq.log.old 2>/dev/null
     done
 ) &
