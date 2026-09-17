@@ -54,14 +54,14 @@ touch /data/bridge
     echo "=== end ==="
 ) &
 
-# Install SSH authorized key from /data (deployed by sd_setup.sh).
+# Install the user's SSH authorized key from /data into /root/.ssh.
+# The key comes solely from /data/ssh_authorized_keys, which the user
+# provisions at flash time via `sd_setup.sh --ssh-pubkey <their key>`.
 # /root lives on the read-only rootfs, so remount rw for the copy then ro.
-# Self-heal: ensure the admin key is present in the persistent store so a
-# wiped /data/ssh_authorized_keys can't lock us out (recovery without SD).
-ADMIN_SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+AiglgHJ0zJMJA8Mg1p/Tkb6c6s0bxHg/yYUaH9uoH caligone@MacBook-Pro-de-PJ.local"
-if ! grep -qF "$ADMIN_SSH_KEY" /data/ssh_authorized_keys 2>/dev/null; then
-    echo "$ADMIN_SSH_KEY" >> /data/ssh_authorized_keys
-fi
+# No key is ever embedded in this script: it must not authorize anyone
+# but the operator who flashed the camera. If /data/ssh_authorized_keys
+# is wiped, re-provision it from the SD (sd_setup.sh) — losing it must
+# lock the camera down, not fall back to a built-in key.
 if [ -f /data/ssh_authorized_keys ]; then
     mount -o remount,rw /
     mkdir -p /root/.ssh
