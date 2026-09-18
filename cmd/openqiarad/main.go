@@ -215,6 +215,17 @@ func main() {
 					logger.Warn("publish sensor state failed", "id", s.ID, "error", err)
 				}
 			}
+			// Republish the current alarm state too, so HA recovers the real
+			// state after a broker/HA restart that dropped the retained value.
+			// Standalone only — in alarmo mode HA Alarmo owns the panel and we
+			// don't publish a standalone alarm entity. See #29.
+			if store.Get().AlarmMode() == "standalone" {
+				if st := getAlarmState(); st != "" {
+					if err := mqttPub.PublishAlarmState(ctx, st); err != nil {
+						logger.Warn("republish alarm state on connect failed", "error", err)
+					}
+				}
+			}
 		})
 
 		// Start no longer fails on an unreachable broker: paho reconnects in the
@@ -547,6 +558,16 @@ func main() {
 		}
 		initSnap := alarmEngine.Snapshot()
 		setAlarmState(string(initSnap.State))
+		// Push the restored state to every publisher. Load() restores the
+		// state without firing onChange, and MQTT's Start() publishes a
+		// hard "disarmed" retained at discovery — so without this, HA/HomeKit
+		// keep showing disarmed after a reboot even though the alarm is armed
+		// (or triggered). This overwrites that stale retained value. See #29.
+		for _, p := range pubs {
+			if err := p.PublishAlarmState(ctx, string(initSnap.State)); err != nil {
+				logger.Warn("publish restored alarm state failed", "error", err)
+			}
+		}
 		logger.Info("alarm engine started", "state", initSnap.State)
 	} else {
 		logger.Info("alarm engine skipped (alarmo mode — HA Alarmo is the source of truth)")
