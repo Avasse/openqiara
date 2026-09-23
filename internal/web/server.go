@@ -1186,7 +1186,20 @@ func (s *Server) handleUpdateAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateMQTT(w http.ResponseWriter, r *http.Request) {
-	var body config.MQTTConfig
+	// TLS fields are pointers so an absent key (nil) leaves the stored value
+	// untouched, while an explicit value (including "") applies. The web UI MQTT
+	// form omits tls_* entirely, so a partial PUT must never wipe a
+	// file-configured TLS setup and silently downgrade the broker to plaintext.
+	var body struct {
+		Broker        string  `json:"broker"`
+		Username      string  `json:"username"`
+		Password      string  `json:"password"`
+		TopicPrefix   string  `json:"topic_prefix"`
+		TLSCACert     *string `json:"tls_ca_cert"`
+		TLSClientCert *string `json:"tls_client_cert"`
+		TLSClientKey  *string `json:"tls_client_key"`
+		TLSInsecure   *bool   `json:"tls_insecure"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "JSON invalide")
 		return
@@ -1208,6 +1221,18 @@ func (s *Server) handleUpdateMQTT(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.TopicPrefix != "" {
 			cfg.MQTT.TopicPrefix = body.TopicPrefix
+		}
+		if body.TLSCACert != nil {
+			cfg.MQTT.TLSCACert = *body.TLSCACert
+		}
+		if body.TLSClientCert != nil {
+			cfg.MQTT.TLSClientCert = *body.TLSClientCert
+		}
+		if body.TLSClientKey != nil {
+			cfg.MQTT.TLSClientKey = *body.TLSClientKey
+		}
+		if body.TLSInsecure != nil {
+			cfg.MQTT.TLSInsecure = *body.TLSInsecure
 		}
 	})
 	if err != nil {

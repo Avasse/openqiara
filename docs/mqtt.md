@@ -15,6 +15,38 @@
 
 Si `broker` est vide, MQTT est désactivé et openqiarad tourne sans.
 
+### TLS / mTLS
+
+Pour chiffrer la connexion au broker, utiliser un schéma `ssl://` (ou `tls://`,
+`mqtts://`) et le port TLS du broker (typiquement `8883`) :
+
+```json
+{
+  "mqtt": {
+    "broker": "ssl://192.168.1.42:8883",
+    "username": "openqiara",
+    "password": "openqiara123",
+    "tls_ca_cert": "/data/mqtt/ca.pem",
+    "tls_client_cert": "/data/mqtt/client.pem",
+    "tls_client_key": "/data/mqtt/client.key",
+    "tls_insecure": false
+  }
+}
+```
+
+- `tls_ca_cert` : chemin d'un bundle CA (PEM) pour valider le certificat du
+  broker. Indispensable pour un broker auto-signé ou à CA privée (Mosquitto
+  local). Absent → paho utilise les CA système.
+- `tls_client_cert` / `tls_client_key` : activent le **mTLS** (authentification
+  par certificat client). Les deux sont requis ensemble.
+- `tls_insecure` : désactive la vérification du certificat. **Test uniquement**,
+  jamais en production.
+
+Un fichier de certificat illisible ou invalide fait **échouer** le démarrage du
+publisher MQTT (log `ERROR`) au lieu de retomber silencieusement en clair. Les
+champs TLS ne sont lus qu'au démarrage : un redémarrage d'openqiarad est requis
+pour les appliquer.
+
 ## Auto-discovery HA
 
 OpenQiara publie des configs auto-discovery sur les topics `homeassistant/...` au démarrage.
