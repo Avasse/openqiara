@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // buildTLSConfig returns a *tls.Config for the broker connection, or nil when no
@@ -14,6 +15,14 @@ import (
 func buildTLSConfig(cfg Config) (*tls.Config, error) {
 	if cfg.TLSCACert == "" && cfg.TLSClientCert == "" && cfg.TLSClientKey == "" && !cfg.TLSInsecure {
 		return nil, nil
+	}
+
+	// paho only applies a TLS config when the broker scheme is a TLS one. A TLS
+	// option set against a plaintext broker (tcp://, or no scheme) would be
+	// silently ignored and the alarm would connect in clear — refuse to start
+	// instead of downgrading.
+	if !isTLSScheme(cfg.Broker) {
+		return nil, fmt.Errorf("mqtt: TLS options set but broker %q has no TLS scheme (ssl://, tls://, mqtts://) — refusing to connect in plaintext", cfg.Broker)
 	}
 
 	tc := &tls.Config{
@@ -45,4 +54,20 @@ func buildTLSConfig(cfg Config) (*tls.Config, error) {
 	}
 
 	return tc, nil
+}
+
+// isTLSScheme reports whether the broker URL uses a scheme for which paho
+// establishes a TLS connection (and thus honours the tls.Config). Mirrors the
+// schemes paho recognises so a valid TLS broker is never rejected here.
+func isTLSScheme(broker string) bool {
+	switch {
+	case strings.HasPrefix(broker, "ssl://"),
+		strings.HasPrefix(broker, "tls://"),
+		strings.HasPrefix(broker, "mqtts://"),
+		strings.HasPrefix(broker, "mqtt+ssl://"),
+		strings.HasPrefix(broker, "tcps://"):
+		return true
+	default:
+		return false
+	}
 }
