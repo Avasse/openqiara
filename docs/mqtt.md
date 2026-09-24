@@ -47,6 +47,16 @@ publisher MQTT (log `ERROR`) au lieu de retomber silencieusement en clair. Les
 champs TLS ne sont lus qu'au démarrage : un redémarrage d'openqiarad est requis
 pour les appliquer.
 
+**Configuration par fichier uniquement.** Les champs `tls_*` se règlent dans
+`openqiara.json` (avec les certificats sur le disque), **pas** via la web UI ni
+l'API : le handler `PUT /api/v1/config/mqtt` les ignore, ce qui évite qu'un
+formulaire web efface la configuration TLS ou repointe les certificats.
+
+**Cohérence schéma/TLS.** Si un champ `tls_*` est renseigné mais que le broker
+n'utilise pas un schéma TLS (`ssl://`, `tls://`, `mqtts://`, `mqtt+ssl://`,
+`tcps://`), openqiarad **refuse de démarrer** au lieu de se connecter en clair —
+paho ignorerait sinon la configuration TLS silencieusement.
+
 ## Auto-discovery HA
 
 OpenQiara publie des configs auto-discovery sur les topics `homeassistant/...` au démarrage.
