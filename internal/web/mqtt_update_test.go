@@ -48,44 +48,33 @@ func putMQTT(t *testing.T, h http.Handler, jsonBody string) int {
 	return rec.Code
 }
 
-// TestUpdateMQTT_PartialPUTPreservesTLS guards the regression where the web UI
-// form (which omits tls_* keys) would wipe a file-configured TLS setup and
-// silently downgrade the broker to plaintext on the next reboot.
-func TestUpdateMQTT_PartialPUTPreservesTLS(t *testing.T) {
+// TestUpdateMQTT_NeverTouchesTLS ensures the web PUT handler cannot alter the
+// file-only TLS configuration. TLS is set out-of-band (openqiara.json + cert
+// files on disk); the handler ignores any tls_* key in the body, so it can
+// neither wipe a working setup nor repoint certificates via the web API — even
+// when a client explicitly sends tls_* values.
+func TestUpdateMQTT_NeverTouchesTLS(t *testing.T) {
 	h, store := mqttTestServer(t)
 
-	// Exactly what the UI MQTT form sends: no tls_* fields.
-	code := putMQTT(t, h, `{"broker":"ssl://broker:8883","username":"openqiara","topic_prefix":"newprefix"}`)
-	if code != http.StatusOK {
+	// A body that both omits and explicitly sets tls_* must leave TLS intact.
+	body := `{"broker":"ssl://broker:8883","topic_prefix":"newprefix",` +
+		`"tls_ca_cert":"/evil/ca.pem","tls_client_cert":"/evil/c.pem",` +
+		`"tls_client_key":"/evil/k.pem","tls_insecure":true}`
+	if code := putMQTT(t, h, body); code != http.StatusOK {
 		t.Fatalf("PUT status = %d, want 200", code)
 	}
 
 	got := store.Get().MQTT
 	if got.TLSCACert != "/data/mqtt/ca.pem" {
-		t.Errorf("partial PUT wiped TLSCACert: got %q, want /data/mqtt/ca.pem", got.TLSCACert)
+		t.Errorf("PUT altered TLSCACert: got %q, want /data/mqtt/ca.pem", got.TLSCACert)
+	}
+	if got.TLSClientCert != "" || got.TLSClientKey != "" {
+		t.Errorf("PUT set client cert/key: got %q / %q, want empty", got.TLSClientCert, got.TLSClientKey)
+	}
+	if got.TLSInsecure {
+		t.Error("PUT set TLSInsecure to true; want unchanged (false)")
 	}
 	if got.TopicPrefix != "newprefix" {
 		t.Errorf("TopicPrefix not applied: got %q, want newprefix", got.TopicPrefix)
-	}
-}
-
-// TestUpdateMQTT_ExplicitTLSAppliesAndClears verifies that an explicit tls_*
-// value is applied, and that an explicit empty string legitimately disables it
-// (the reason the fields are pointers rather than "" guards).
-func TestUpdateMQTT_ExplicitTLSAppliesAndClears(t *testing.T) {
-	h, store := mqttTestServer(t)
-
-	if code := putMQTT(t, h, `{"broker":"ssl://broker:8883","tls_ca_cert":"/new/ca.pem"}`); code != http.StatusOK {
-		t.Fatalf("set PUT status = %d, want 200", code)
-	}
-	if got := store.Get().MQTT.TLSCACert; got != "/new/ca.pem" {
-		t.Errorf("explicit tls_ca_cert not applied: got %q", got)
-	}
-
-	if code := putMQTT(t, h, `{"broker":"tcp://broker:1883","tls_ca_cert":""}`); code != http.StatusOK {
-		t.Fatalf("clear PUT status = %d, want 200", code)
-	}
-	if got := store.Get().MQTT.TLSCACert; got != "" {
-		t.Errorf("explicit empty tls_ca_cert did not clear it: got %q", got)
 	}
 }
