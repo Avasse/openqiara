@@ -20,6 +20,7 @@ import (
 	"github.com/caligone/openqiara/internal/camera"
 	"github.com/caligone/openqiara/internal/config"
 	"github.com/caligone/openqiara/internal/hlevents"
+	"github.com/caligone/openqiara/internal/mqtt"
 	"github.com/caligone/openqiara/internal/ota"
 )
 
@@ -1202,6 +1203,12 @@ func (s *Server) handleUpdateMQTT(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := validateBrokerURL(body.Broker); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// With file-configured TLS, a plaintext broker would make the MQTT
+	// publisher fail at next boot: refuse it here, where the user sees it.
+	if body.Broker != "" && s.store.Get().MQTT.HasTLS() && !mqtt.IsTLSScheme(body.Broker) {
+		writeErr(w, http.StatusBadRequest, "broker invalide : TLS configuré par fichier, schéma TLS requis (ssl://, mqtts://…)")
 		return
 	}
 

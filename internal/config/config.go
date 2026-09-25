@@ -193,6 +193,11 @@ type MQTTConfig struct {
 	TLSInsecure   bool   `json:"tls_insecure,omitempty"`
 }
 
+// HasTLS reports whether any file-configured TLS option is set.
+func (m MQTTConfig) HasTLS() bool {
+	return m.TLSCACert != "" || m.TLSClientCert != "" || m.TLSClientKey != "" || m.TLSInsecure
+}
+
 // AdminConfig holds web UI admin credentials.
 // Si PasswordHash et Password sont tous les deux vides, l'UI est ouverte.
 // Username fixe = "admin" (non configurable).

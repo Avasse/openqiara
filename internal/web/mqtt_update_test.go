@@ -78,3 +78,17 @@ func TestUpdateMQTT_NeverTouchesTLS(t *testing.T) {
 		t.Errorf("TopicPrefix not applied: got %q, want newprefix", got.TopicPrefix)
 	}
 }
+
+// TestUpdateMQTT_RejectsPlaintextBrokerWithTLS ensures the web UI cannot switch
+// a file-configured TLS setup to a plaintext broker, which would only surface
+// as an MQTT start failure at the next boot.
+func TestUpdateMQTT_RejectsPlaintextBrokerWithTLS(t *testing.T) {
+	h, store := mqttTestServer(t)
+
+	if code := putMQTT(t, h, `{"broker":"tcp://broker:1883"}`); code != http.StatusBadRequest {
+		t.Fatalf("PUT status = %d, want 400", code)
+	}
+	if got := store.Get().MQTT.Broker; got != "ssl://broker:8883" {
+		t.Errorf("broker changed to %q, want ssl://broker:8883", got)
+	}
+}

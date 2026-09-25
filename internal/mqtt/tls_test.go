@@ -146,7 +146,7 @@ func TestBuildTLSConfig_TLSWithoutSSLSchemeErrors(t *testing.T) {
 // other TLS schemes paho recognises (tls://, mqtts://, …).
 func TestBuildTLSConfig_AcceptsAllTLSSchemes(t *testing.T) {
 	cert, _ := writeSelfSigned(t)
-	for _, broker := range []string{"ssl://b:8883", "tls://b:8883", "mqtts://b:8883", "mqtt+ssl://b:8883", "tcps://b:8883"} {
+	for _, broker := range []string{"ssl://b:8883", "tls://b:8883", "mqtts://b:8883", "mqtt+ssl://b:8883", "tcps://b:8883", "wss://b:443"} {
 		t.Run(broker, func(t *testing.T) {
 			if _, err := buildTLSConfig(Config{Broker: broker, TLSCACert: cert}); err != nil {
 				t.Fatalf("unexpected error for TLS scheme %q: %v", broker, err)

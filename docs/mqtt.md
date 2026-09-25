@@ -36,7 +36,8 @@ Pour chiffrer la connexion au broker, utiliser un schéma `ssl://` (ou `tls://`,
 
 - `tls_ca_cert` : chemin d'un bundle CA (PEM) pour valider le certificat du
   broker. Indispensable pour un broker auto-signé ou à CA privée (Mosquitto
-  local). Absent → paho utilise les CA système.
+  local). Absent → CA système, qui n'existent probablement pas sur la
+  caméra : en pratique, à renseigner.
 - `tls_client_cert` / `tls_client_key` : activent le **mTLS** (authentification
   par certificat client). Les deux sont requis ensemble.
 - `tls_insecure` : désactive la vérification du certificat. **Test uniquement**,
@@ -54,8 +55,10 @@ formulaire web efface la configuration TLS ou repointe les certificats.
 
 **Cohérence schéma/TLS.** Si un champ `tls_*` est renseigné mais que le broker
 n'utilise pas un schéma TLS (`ssl://`, `tls://`, `mqtts://`, `mqtt+ssl://`,
-`tcps://`), openqiarad **refuse de démarrer** au lieu de se connecter en clair —
-paho ignorerait sinon la configuration TLS silencieusement.
+`tcps://`, `wss://`), le publisher MQTT **ne démarre pas** (log `ERROR`, le reste
+d'openqiarad tourne) au lieu de se connecter en clair — paho ignorerait sinon la
+configuration TLS silencieusement. Pour la même raison, `PUT /api/v1/config/mqtt`
+refuse (`400`) un broker sans schéma TLS quand des `tls_*` sont configurés.
 
 ## Auto-discovery HA
 
