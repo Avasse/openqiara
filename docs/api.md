@@ -229,7 +229,7 @@ Montées uniquement avec le flag `-debug` ; sinon `410`.
 | Méthode | Chemin | Corps |
 |---|---|---|
 | `POST` | `/api/v1/commands/debug/pkt` | `{hex}` |
-| `POST` | `/api/v1/commands/debug/siren/sequence` | `{payload, addr?, handshake?, stop?, hold_ms?}` |
+| `POST` | `/api/v1/commands/debug/siren/sequence` | `{payload, addr, handshake?, stop?, hold_ms?}` |
 
 > **Ces endpoints envoient des trames brutes au MCU.** Certains opcodes
 > (`0x03`, `0x08`) le font planter, et une remise en service demande un

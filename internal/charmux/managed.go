@@ -1,7 +1,6 @@
 package charmux
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
 )
@@ -159,68 +158,6 @@ func DeserializeManagedFrame(data []byte) (*ManagedFrame, error) {
 	return f, nil
 }
 
-// SendManaged serializes a managed frame and sends it on the PKT channel
-// using the 0x1C + 8-byte chunk protocol.
-func (c *Client) SendManaged(ctx context.Context, frame *ManagedFrame) error {
-	data := frame.Serialize()
-
-	// Send in 8-byte chunks, each prefixed with 0x1C
-	for i := 0; i < len(data); i += 8 {
-		end := i + 8
-		if end > len(data) {
-			end = len(data)
-		}
-		chunk := make([]byte, 1+end-i)
-		chunk[0] = 0x1C
-		copy(chunk[1:], data[i:end])
-
-		if _, err := c.pktConn.Write(chunk); err != nil {
-			return fmt.Errorf("send managed chunk: %w", err)
-		}
-	}
-
-	// Send end marker
-	if _, err := c.pktConn.Write([]byte{0x1D}); err != nil {
-		return fmt.Errorf("send managed end: %w", err)
-	}
-
-	return nil
-}
-
-// NewConfigFrame creates a managed frame for sending config to a sensor.
-// flags = FlagZ | FlagW (0x03), wflags = 1.
-func NewConfigFrame(dst uint32, counter uint32, payload []byte) *ManagedFrame {
-	return &ManagedFrame{
-		GWDst:   dst,
-		GWSrc:   1,
-		RFByte:  0,
-		Counter: counter,
-		Src:     1,
-		Flags:   FlagZ | FlagW, // 0x03
-		AckDst:  dst,
-		AckCnt:  0,
-		WFlags:  1,
-		Payload: payload,
-	}
-}
-
-// NewBytecodeFrame creates a managed frame for uploading bytecode to a sensor.
-// flags = FlagZ | FlagW (0x03), wflags = 0xCD.
-func NewBytecodeFrame(dst uint32, counter uint32, payload []byte) *ManagedFrame {
-	return &ManagedFrame{
-		GWDst:   dst,
-		GWSrc:   1,
-		RFByte:  0,
-		Counter: counter,
-		Src:     1,
-		Flags:   FlagZ | FlagW, // 0x03
-		AckDst:  dst,
-		AckCnt:  0,
-		WFlags:  0xCD,
-		Payload: payload,
-	}
-}
-
 // --- varint encoding (protobuf-style) ---
 
 func appendVarint(buf []byte, v uint32) []byte {
@@ -230,12 +167,6 @@ func appendVarint(buf []byte, v uint32) []byte {
 	}
 	buf = append(buf, byte(v))
 	return buf
-}
-
-// DecodeVarint decodes a protobuf-style varint from data.
-// Returns the value and number of bytes consumed.
-func DecodeVarint(data []byte) (uint32, int) {
-	return decodeVarint(data)
 }
 
 func decodeVarint(data []byte) (uint32, int) {

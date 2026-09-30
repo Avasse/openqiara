@@ -73,6 +73,7 @@ func main() {
 	logPath := flag.String("log", "", "path to log file with rotation; empty = stdout")
 	logMaxMB := flag.Int("log-max-mb", 1, "max size per log file (MB) before rotation")
 	logMaxBackups := flag.Int("log-max-backups", 3, "max number of rotated files to keep")
+	logLevel := flag.String("log-level", "info", "debug, info, warn or error; debug traces every radio frame (charmux mode)")
 	flag.Parse()
 
 	if *showVersion {
@@ -81,7 +82,12 @@ func main() {
 	}
 
 	logWriter := newLogWriter(*logPath, *logMaxMB, *logMaxBackups)
-	logger := slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(*logLevel)); err != nil {
+		fmt.Fprintln(os.Stderr, "openqiarad:", err)
+		os.Exit(2)
+	}
+	logger := slog.New(slog.NewTextHandler(logWriter, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(logger)
 	logger.Info("openqiarad starting", "version", BuildInfo(), "config", *configPath, "poll_interval", *pollInterval, "mode", *mode)
 
@@ -95,25 +101,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Build known sensor types from config for charmux UNKNOWN resolution
-	knownTypes := make(map[int]string, len(cfg.Sensors))
-	kpdCodes := make(map[int]string)
-	for _, se := range cfg.Sensors {
-		if se.Type != "" {
-			knownTypes[se.ID] = se.Type
-		}
-		if se.KPDCode != "" {
-			kpdCodes[se.ID] = se.KPDCode
-		}
-	}
-	// Build deleted IDs set from config
-	deletedIDs := make(map[int]bool, len(cfg.DeletedIDs))
-	for _, id := range cfg.DeletedIDs {
-		deletedIDs[id] = true
-	}
-
 	// Create camera client based on mode
-	cam := createCamera(ctx, *mode, knownTypes, deletedIDs, kpdCodes, logger)
+	cam := createCamera(ctx, *mode, store, logger)
 	if cam == nil {
 		logger.Error("no camera backend available")
 		os.Exit(1)
@@ -812,14 +801,16 @@ func buildSensorList(ctx context.Context, cam camera.Client, store *config.Store
 	return sensors, nil
 }
 
-func createCamera(ctx context.Context, mode string, knownTypes map[int]string, deletedIDs map[int]bool, kpdCodes map[int]string, logger *slog.Logger) camera.Client {
+// createCamera picks the backend. auto tries charmux first: it fails
+// while fbxhome runs, as fbxhome holds the charmux ports.
+func createCamera(ctx context.Context, mode string, store *config.Store, logger *slog.Logger) camera.Client {
 	switch mode {
 	case "charmux":
-		return createCharmuxClient(ctx, knownTypes, deletedIDs, kpdCodes, logger)
+		return createCharmuxClient(ctx, store, logger)
 	case "fbxhome":
 		return createFbxhomeClient(ctx, logger)
 	default:
-		c := createCharmuxClient(ctx, knownTypes, deletedIDs, kpdCodes, logger)
+		c := createCharmuxClient(ctx, store, logger)
 		if c != nil {
 			return c
 		}
@@ -828,15 +819,9 @@ func createCamera(ctx context.Context, mode string, knownTypes map[int]string, d
 	}
 }
 
-func createCharmuxClient(ctx context.Context, knownTypes map[int]string, deletedIDs map[int]bool, kpdCodes map[int]string, logger *slog.Logger) camera.Client {
-	mux := charmux.New(charmux.WithLogger(logger))
-	c := camera.NewCharmuxClient(
-		camera.WithCharmux(mux),
-		camera.WithCharmuxLogger(logger),
-		camera.WithKnownSensorTypes(knownTypes),
-		camera.WithDeletedIDs(deletedIDs),
-		camera.WithKPDCodes(kpdCodes),
-	)
+// createCharmuxClient makes openqiarad the radio gateway, fbxhome stopped.
+func createCharmuxClient(ctx context.Context, store *config.Store, logger *slog.Logger) camera.Client {
+	c := camera.NewRadioClient(charmux.New(charmux.WithLogger(logger)), store, logger)
 	if err := c.Connect(ctx); err != nil {
 		logger.Warn("charmux connect failed", "error", err)
 		return nil

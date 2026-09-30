@@ -2,6 +2,9 @@
 bin/
 *.bin
 *.img
+# Captures from the camera: a pairing carries the vendor key in clear.
+*.pcap
+*.pcapng
 
 # Local binaries (root-of-repo build artifacts)
 /openqiarad

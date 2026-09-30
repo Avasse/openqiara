@@ -1931,17 +1931,17 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "payload"
+                  "payload",
+                  "addr"
                 ],
                 "properties": {
                   "payload": {
                     "type": "string",
-                    "description": "Charge utile en hexadécimal."
+                    "description": "Charge utile applicative en hexadécimal, à partir de l'octet `55` (ex. `5505010a28`, test discret)."
                   },
                   "addr": {
                     "type": "integer",
-                    "description": "Adresse de la sirène.",
-                    "default": 18
+                    "description": "Adresse radio de la sirène, qui doit être appairée."
                   },
                   "handshake": {
                     "type": "boolean",
@@ -1975,7 +1975,7 @@
             }
           },
           "400": {
-            "description": "JSON malformé, charge utile absente ou hexadécimal invalide.",
+            "description": "JSON malformé, adresse ou charge utile absente, ou hexadécimal invalide.",
             "content": {
               "application/json": {
                 "schema": {

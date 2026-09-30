@@ -901,7 +901,7 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	// camera_mode lets the UI know whether to expose openqiarad-only
 	// timings (charmux mode) or hide them because fbxhome owns them.
 	cameraMode := "fbxhome"
-	if _, ok := s.cam.(*camera.CharmuxClient); ok {
+	if _, ok := s.cam.(*camera.RadioClient); ok {
 		cameraMode = "charmux"
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -1568,9 +1568,11 @@ func (s *Server) handleSetKPDCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update runtime code for next reinit.
-	if cc, ok := s.cam.(*camera.CharmuxClient); ok {
-		cc.SetKPDCode(kpd.ID, body.Password)
+	// Radio backend: the code goes out at the keypad's next wake.
+	if rc, ok := s.cam.(*camera.RadioClient); ok {
+		if err := rc.Reload(); err != nil {
+			s.log.Warn("radio reload failed", "error", err)
+		}
 	}
 	// In fbxhome mode : push le code via endpoints_write pwd. Si le KPD vient
 	// d'être pairé (< 30s), on diffère l'écriture : fbxhome est encore en
@@ -1660,8 +1662,10 @@ func (s *Server) handleDeleteKPDCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if cc, ok := s.cam.(*camera.CharmuxClient); ok {
-		cc.SetKPDCode(kpd.ID, "")
+	if rc, ok := s.cam.(*camera.RadioClient); ok {
+		if err := rc.Reload(); err != nil {
+			s.log.Warn("radio reload failed", "error", err)
+		}
 	}
 	if fc, ok := s.cam.(*camera.FbxhomeClient); ok {
 		if err := fc.ClearKPDPassword(r.Context(), kpd.ID); err != nil {
@@ -1844,8 +1848,8 @@ func (s *Server) handleDebugPKT(w http.ResponseWriter, r *http.Request) {
 //
 //	POST /api/debug/siren/sequence
 //	{
-//	  "addr": 18,                  // SRN addr (défaut 18)
-//	  "payload": "01550b00...",    // payload hex à envoyer
+//	  "addr": 6,                   // adresse radio de la SRN (requis)
+//	  "payload": "5505010a28",     // payload applicatif hex, à partir du 55
 //	  "handshake": true,           // envoyer 55 0b avant (défaut true)
 //	  "stop": true,                // envoyer 55 05 00 84 après (défaut true)
 //	  "hold_ms": 3400              // attente entre payload et stop (défaut 3400)
@@ -1862,8 +1866,9 @@ func (s *Server) handleDebugSirenSeq(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "JSON invalide")
 		return
 	}
-	if body.Addr == 0 {
-		body.Addr = 18
+	if body.Addr <= 0 {
+		writeErr(w, http.StatusBadRequest, "addr requis (adresse radio de la sirène)")
+		return
 	}
 	if body.Payload == "" {
 		writeErr(w, http.StatusBadRequest, "payload hex requis")
@@ -1887,9 +1892,9 @@ func (s *Server) handleDebugSirenSeq(w http.ResponseWriter, r *http.Request) {
 		holdMs = 3400
 	}
 
-	cc, ok := s.cam.(*camera.CharmuxClient)
+	rc, ok := s.cam.(*camera.RadioClient)
 	if !ok {
-		writeErr(w, http.StatusServiceUnavailable, "caméra non CharmuxClient")
+		writeErr(w, http.StatusServiceUnavailable, "disponible en mode charmux uniquement")
 		return
 	}
 
@@ -1901,7 +1906,7 @@ func (s *Server) handleDebugSirenSeq(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 
-	if err := cc.SendSirenDebug(ctx, body.Addr, payload, withHandshake, withStop, holdMs); err != nil {
+	if err := rc.SendSirenDebug(ctx, uint32(body.Addr), payload, withHandshake, withStop, time.Duration(holdMs)*time.Millisecond); err != nil {
 		writeErr(w, http.StatusInternalServerError, "séquence sirène: "+err.Error())
 		return
 	}

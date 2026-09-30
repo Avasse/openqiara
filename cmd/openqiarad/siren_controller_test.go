@@ -231,3 +231,32 @@ func TestWailErrorDoesntPanic(t *testing.T) {
 		t.Errorf("expected the call to happen even with error")
 	}
 }
+
+// fakeRadioCam est une caméra en mode charmux : elle sait jouer les bips.
+type fakeRadioCam struct {
+	fakeCam
+	beeps []camera.SirenTone
+}
+
+func (f *fakeRadioCam) SirenBeep(_ context.Context, _ int, tone camera.SirenTone) error {
+	f.beeps = append(f.beeps, tone)
+	return nil
+}
+
+// TestCharmuxBeeps : en mode charmux, l'armement bipe, et le désarmement
+// coupe la sirène puis bipe.
+func TestCharmuxBeeps(t *testing.T) {
+	cam := &fakeRadioCam{fakeCam: fakeCam{sensors: []camera.Sensor{srnSensor(29)}}}
+	sc, _ := newTestController(t, cam, "all")
+
+	sc.Handle("arming", "disarmed")
+	sc.Handle("disarmed", "arming")
+
+	want := []camera.SirenTone{camera.ToneArming, camera.ToneDisarm}
+	if len(cam.beeps) != 2 || cam.beeps[0] != want[0] || cam.beeps[1] != want[1] {
+		t.Errorf("bips = %v, attendu %v", cam.beeps, want)
+	}
+	if len(cam.stopSirenCalls) != 1 {
+		t.Errorf("StopSiren appelé %d fois, attendu 1", len(cam.stopSirenCalls))
+	}
+}

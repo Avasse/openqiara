@@ -2,7 +2,10 @@
 # Envoie un payload hex arbitraire vers la SRN pour tester des opcodes.
 #
 # Usage:
-#   ./scripts/test_siren_sequence.sh <payload_hex> [addr]
+#   ./scripts/test_siren_sequence.sh <payload_hex> <addr>
+#
+# payload_hex : charge utile applicative, à partir du 55 (ex. 5505010a28).
+# addr        : adresse radio de la sirène (config sensors[].radio.addr).
 #
 # Presets :
 #   ./scripts/test_siren_sequence.sh beep     # bip pré-armement (subtype 02)
@@ -19,12 +22,12 @@ set -euo pipefail
 
 CAM_HOST="${CAM_HOST:?CAM_HOST required (e.g. 192.168.1.50)}"
 WEB_AUTH="${WEB_AUTH:?WEB_AUTH required (e.g. admin:yourpassword)}"
-ARG="${1:?Usage: $0 <hex_payload|preset> [addr]}"
-ADDR="${2:-18}"
+ARG="${1:?Usage: $0 <hex_payload|preset> <addr>}"
+ADDR="${2:?Usage: $0 <hex_payload|preset> <addr>}"
 
 case "$ARG" in
-  beep)   PAYLOAD="0155041e1e9605640200000000000000030000000000000003" ;;
-  disarm) PAYLOAD="0155041e1e9605640300000000000000030000000000000003" ;;
+  beep)   PAYLOAD="55041e1e9605640200000000000000030000000000000003" ;;
+  disarm) PAYLOAD="55041e1e9605640300000000000000030000000000000003" ;;
   *)      PAYLOAD="$ARG" ;;
 esac
 PAYLOAD="${PAYLOAD// /}"

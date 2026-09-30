@@ -2,11 +2,7 @@ package camera
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 )
 
@@ -25,41 +21,9 @@ type AlarmTimings struct {
 // XML directly. fbxhome rotates /data/fbxhome.xml.0..9 in a wear-levelled
 // way, so we pick the file with the highest counter="N" attribute.
 func ReadAlarmTimings() (AlarmTimings, error) {
-	matches, err := filepath.Glob("/data/fbxhome.xml.*")
+	data, err := latestFbxhomeXML(fbxhomeXMLGlob)
 	if err != nil {
-		return AlarmTimings{}, fmt.Errorf("glob xml: %w", err)
-	}
-	type rotated struct {
-		path    string
-		counter int
-	}
-	var rs []rotated
-	cntRe := regexp.MustCompile(`counter="(\d+)"`)
-	for _, p := range matches {
-		// Skip .bak and any file that's not strictly .N (digit).
-		base := filepath.Base(p)
-		suf := base[len("fbxhome.xml."):]
-		if _, err := strconv.Atoi(suf); err != nil {
-			continue
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		m := cntRe.FindSubmatch(data)
-		if m == nil {
-			continue
-		}
-		c, _ := strconv.Atoi(string(m[1]))
-		rs = append(rs, rotated{path: p, counter: c})
-	}
-	if len(rs) == 0 {
-		return AlarmTimings{}, fmt.Errorf("no fbxhome.xml.N found")
-	}
-	sort.Slice(rs, func(i, j int) bool { return rs[i].counter > rs[j].counter })
-	data, err := os.ReadFile(rs[0].path)
-	if err != nil {
-		return AlarmTimings{}, fmt.Errorf("read latest xml: %w", err)
+		return AlarmTimings{}, err
 	}
 
 	t := AlarmTimings{}

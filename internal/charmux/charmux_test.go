@@ -180,3 +180,44 @@ func TestPKTEvents(t *testing.T) {
 
 	_ = c.Close()
 }
+
+// TestUnsolicitedCTRLReachesEvents: a CTRL frame nobody asked for (a
+// pairing beacon) comes out of Events right away, instead of waiting in
+// the response slot of the next SendCTRL.
+func TestUnsolicitedCTRLReachesEvents(t *testing.T) {
+	clientPort, serverPort := pickFreePorts(t)
+	origPorts := defaultPorts[ChannelCTRL]
+	defaultPorts[ChannelCTRL] = [2]int{clientPort, serverPort}
+	defer func() { defaultPorts[ChannelCTRL] = origPorts }()
+
+	pktClient, pktServer := pickFreePorts(t)
+	origPKT := defaultPorts[ChannelPKT]
+	defaultPorts[ChannelPKT] = [2]int{pktClient, pktServer}
+	defer func() { defaultPorts[ChannelPKT] = origPKT }()
+
+	ctrlMock := newMockServer(t, serverPort)
+	defer ctrlMock.close()
+	pktMock := newMockServer(t, pktServer)
+	defer pktMock.close()
+
+	c := New(WithReadTimeout(2 * time.Second))
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer func() { _ = c.Close() }()
+
+	beacon := []byte{0x17, 0x0f, 0x06}
+	clientAddr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: clientPort}
+	if _, err := ctrlMock.conn.WriteToUDP(beacon, clientAddr); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case ev := <-c.Events():
+		if ev.Channel != ChannelCTRL || ev.Data[0] != 0x17 {
+			t.Errorf("event = %d %x, want CTRL 170f06", ev.Channel, ev.Data)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("unsolicited CTRL frame never reached Events")
+	}
+}

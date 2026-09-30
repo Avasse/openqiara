@@ -29,6 +29,11 @@ type Config struct {
 	Alarm      AlarmConfig   `json:"alarm"`
 	Sensors    []SensorEntry `json:"sensors,omitempty"`
 	DeletedIDs []int         `json:"deleted_ids,omitempty"`
+
+	// RadioNextAddr is the radio address the next pairing gives (charmux
+	// mode). It only grows, like fbxhome's domus_next_addr: the MCU has no
+	// way to forget a sensor, so an address is never given twice.
+	RadioNextAddr uint32 `json:"radio_next_addr,omitempty"`
 }
 
 // WebConfig holds web UI settings.
@@ -282,6 +287,18 @@ type SensorEntry struct {
 	NightAlarm *bool `json:"night_alarm,omitempty"`
 	DayTimed   *bool `json:"day_timed,omitempty"`
 	NightTimed *bool `json:"night_timed,omitempty"`
+
+	// Radio is where the sensor sits on the radio network, for charmux
+	// mode (fbxhome keeps it in its own XML): set at pairing, imported
+	// from fbxhome.xml when openqiarad takes the radio over.
+	Radio RadioNode `json:"radio,omitzero"`
+}
+
+// RadioNode is a sensor's place on the radio network. Addr 0 means none.
+type RadioNode struct {
+	Addr        uint32 `json:"addr"`         // assigned at pairing
+	UID         string `json:"uid"`          // hardware id from the pairing beacon, hex
+	SystemIndex uint8  `json:"system_index"` // 0..63, sent in the sensor's config
 }
 
 // Store loads and saves configuration from a JSON file.

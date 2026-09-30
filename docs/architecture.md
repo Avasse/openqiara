@@ -38,8 +38,8 @@ Le binaire fbxhome est patché (2 NOPs) pour découpler le KPD de la machine à
 ## Modes caméra
 
 OpenQiara peut parler au MCU de deux façons, sélectionnées au démarrage via
-`-mode fbxhome|charmux|auto`. Le mode recommandé (et le plus testé) est
-**fbxhome**.
+`-mode fbxhome|charmux|auto`. Le mode de production est **fbxhome** ; le
+mode **charmux** doit le remplacer.
 
 ### Mode fbxhome (par défaut, recommandé)
 
@@ -60,24 +60,35 @@ Compromis : conserve la gestion crypto MCU, la logique heartbeat, et le flow
 de push de bytecode de fbxhome. On perd un peu de contrôle bas niveau sur la
 radio.
 
-### Mode charmux (legacy, debug)
+### Mode charmux (openqiarad passerelle radio, en validation)
 
-OpenQiara parle directement au MCU via les sockets UDP charmux :
+OpenQiara est lui-même la passerelle radio, fbxhome arrêté :
 
 ```
-openqiarad → UDP 8000/8002 → charmux → MCU
+openqiarad → UDP 8001/8003 → charmux → MCU
 ```
 
-Supprime la dépendance à fbxhome. Appairage réimplémenté en Go (handshake
-9 phases, crypto AES-128-OCB3). Utile pour l'investigation radio bas niveau
-mais **pas la voie de production** — fbxhome est plus éprouvé pour le cycle
-de vie des capteurs.
+`camera.RadioClient` confie la radio au moteur `internal/radio`, qui
+reproduit fbxhome trame pour trame : il répond à chaque trame qui attend
+une réponse (Z), pousse bytecode, heure, config et codes clavier quand le
+capteur les demande, et traduit ses trames en événements. Rejoué sur les
+logs de fbxhome en production (`cmd/radio-shadow`), il ne diffère d'aucune
+trame. L'appairage (`domus.Pair`) ne fait que le handshake CTRL : le
+capteur est ensuite provisionné comme après n'importe quel redémarrage.
 
-### Remplacement constructeur complet (futur)
+Le registre des capteurs est la config (`sensors[].radio` : adresse, UID,
+index système). Au premier démarrage, il est importé de `fbxhome.xml` :
+chaque capteur garde son id fbxhome, donc ses entités Home Assistant et
+Alarmo. Le mode jour/nuit passe par `fbxbusctl set hlcamd video_settings`,
+le volet par le canal charmux 8006/8007.
 
-Supprimer fbxhome entièrement (flashage firmware MCU via uartboot pure-Go,
-toute la gestion capteurs dans `openqiarad`) est un objectif long terme. Pas
-sur la roadmap court terme.
+Le démarrage échoue tant que fbxhome tourne : il tient les ports charmux.
+`-mode auto` retombe alors sur le mode fbxhome. Retour arrière : relancer
+fbxhome, dont l'état est intact. `-log-level debug` trace chaque trame
+(sans les codes clavier).
+
+Pas encore validé sur matériel ; non géré : capteurs derrière un répéteur,
+redémarrage à distance de la sirène.
 
 ## Layout rootfs
 

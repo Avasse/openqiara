@@ -19,12 +19,15 @@ type sirenAPI interface {
 	StopSiren(ctx context.Context, sensorID int) error
 }
 
-// charmuxBeeper expose les tones charmux dédiés (arming/disarm beeps).
-// Implémenté par camera.CharmuxClient ; nil en mode fbxhome.
-type charmuxBeeper interface {
-	SendSirenBeep(ctx context.Context, sensorID int) error
-	SendSirenDebug(ctx context.Context, sensorID int, payload []byte, ackReq, longACK bool, rfCfg uint16) error
+// sirenBeeper joue les bips courts de la sirène (armement, désarmement).
+// Implémenté par camera.RadioClient ; nil en mode fbxhome.
+type sirenBeeper interface {
+	SirenBeep(ctx context.Context, sensorID int, tone camera.SirenTone) error
 }
+
+// Une interface détectée par assertion de type échoue en silence si la
+// signature diverge : les bips charmux n'ont jamais joué pour cette raison.
+var _ sirenBeeper = (*camera.RadioClient)(nil)
 
 // sirenController pilote la sirène physique en fonction des transitions
 // d'état de la centrale d'alarme.
@@ -39,7 +42,7 @@ type charmuxBeeper interface {
 //     assertions immédiates.
 type sirenController struct {
 	cam     sirenAPI
-	charmux charmuxBeeper // nil = mode fbxhome
+	beeper sirenBeeper // nil = mode fbxhome
 	store   *config.Store
 	logger  *slog.Logger
 	ctx     context.Context
@@ -60,10 +63,8 @@ func newSirenController(ctx context.Context, cam sirenAPI, store *config.Store, 
 		logger: logger,
 		ctx:    ctx,
 	}
-	// Détecter le charmux si applicable. Cast safe : cam *peut* être un
-	// CharmuxClient ou un FbxhomeClient.
-	if cc, ok := cam.(charmuxBeeper); ok {
-		sc.charmux = cc
+	if b, ok := cam.(sirenBeeper); ok {
+		sc.beeper = b
 	}
 	return sc
 }
@@ -109,7 +110,7 @@ func (s *sirenController) Handle(newState, prevState string) {
 		// vendor est `test=true` qui déclenche un wail (≈1s audible avant
 		// que le reboot_srn du disarm ne le coupe). Ce n'est pas un beep
 		// court — skip plutôt que produire un faux beep.
-		if s.charmux == nil {
+		if s.beeper == nil {
 			return
 		}
 		s.run(func() {
@@ -118,7 +119,7 @@ func (s *sirenController) Handle(newState, prevState string) {
 				return
 			}
 			s.logger.Info("siren: arming beep", "addr", addr)
-			if err := s.charmux.SendSirenBeep(s.ctx, addr); err != nil {
+			if err := s.beeper.SirenBeep(s.ctx, addr, camera.ToneArming); err != nil {
 				s.logger.Error("siren: arming beep failed", "error", err)
 			}
 		})
@@ -146,15 +147,12 @@ func (s *sirenController) Handle(newState, prevState string) {
 			if err := s.cam.StopSiren(s.ctx, addr); err != nil {
 				s.logger.Error("siren: stop failed", "error", err)
 			}
-			if mode == "all" && s.charmux != nil {
+			if mode == "all" && s.beeper != nil {
 				// Disarm beep — uniquement dispo comme tone dédié en charmux.
 				// En mode fbxhome il n'y a pas d'équivalent court : skip.
-				disarmBeep := []byte{
-					0x01, 0x55, 0x04, 0x1e, 0x1e, 0x96, 0x05, 0x64, 0x03,
-					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
-					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+				if err := s.beeper.SirenBeep(s.ctx, addr, camera.ToneDisarm); err != nil {
+					s.logger.Error("siren: disarm beep failed", "error", err)
 				}
-				_ = s.charmux.SendSirenDebug(s.ctx, addr, disarmBeep, true, true, 3400)
 			}
 		})
 	}

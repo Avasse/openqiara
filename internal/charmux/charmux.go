@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -21,9 +22,9 @@ const (
 
 type Option func(*Client)
 
-func WithHost(host string) Option   { return func(c *Client) { c.host = host } }
+func WithHost(host string) Option            { return func(c *Client) { c.host = host } }
 func WithReadTimeout(d time.Duration) Option { return func(c *Client) { c.readTimeout = d } }
-func WithLogger(l *slog.Logger) Option { return func(c *Client) { c.log = l } }
+func WithLogger(l *slog.Logger) Option       { return func(c *Client) { c.log = l } }
 
 type Client struct {
 	host        string
@@ -33,14 +34,16 @@ type Client struct {
 	ctrlConn    *net.UDPConn
 	pktConn     *net.UDPConn
 	shutterConn *net.UDPConn
-	events chan Event
-	done   chan struct{}
-	wg     sync.WaitGroup
+	events      chan Event
+	done        chan struct{}
+	wg          sync.WaitGroup
 
-	// CTRL request/response: caller sends request, waits on ctrlResp
-	ctrlMu   sync.Mutex
-	ctrlReq  chan []byte   // send a CTRL command
-	ctrlResp chan []byte   // receive the matching response
+	// CTRL request/response: SendCTRL waits on ctrlResp while ctrlWaiting
+	// is set. Any other CTRL frame (pairing beacons, spontaneous stops)
+	// goes to events.
+	ctrlMu      sync.Mutex
+	ctrlWaiting atomic.Bool
+	ctrlResp    chan []byte
 }
 
 func New(opts ...Option) *Client {
@@ -50,7 +53,6 @@ func New(opts ...Option) *Client {
 		log:         slog.Default(),
 		events:      make(chan Event, eventChanSize),
 		done:        make(chan struct{}),
-		ctrlReq:     make(chan []byte),
 		ctrlResp:    make(chan []byte, 1),
 	}
 	for _, o := range opts {
@@ -132,6 +134,8 @@ var responseOpcode = map[byte]byte{
 func (c *Client) SendCTRL(ctx context.Context, data []byte) ([]byte, error) {
 	c.ctrlMu.Lock()
 	defer c.ctrlMu.Unlock()
+	c.ctrlWaiting.Store(true)
+	defer c.ctrlWaiting.Store(false)
 
 	if _, err := c.ctrlConn.Write(data); err != nil {
 		return nil, fmt.Errorf("charmux: write CTRL: %w", err)
@@ -171,10 +175,6 @@ func (c *Client) SendRawCTRL(data []byte) error {
 	return err
 }
 
-// StartCTRLListener is a no-op — the CTRL listener runs permanently now.
-func (c *Client) StartCTRLListener() {}
-func (c *Client) StopCTRLListener()  {}
-
 // SendPKT sends raw data on the PKT UDP channel (→ UART channel 1).
 func (c *Client) SendPKT(_ context.Context, data []byte) error {
 	_, err := c.pktConn.Write(data)
@@ -212,10 +212,6 @@ func (c *Client) SendShutter(open bool) error {
 
 // Events returns the channel for async events (PKT + unsolicited CTRL).
 func (c *Client) Events() chan Event { return c.events }
-
-// CTRLResp returns the channel where CTRL responses are buffered.
-// Used by the pairing code to drain responses that SendCTRL would normally read.
-func (c *Client) CTRLResp() <-chan []byte { return c.ctrlResp }
 
 func (c *Client) Close() error {
 	close(c.done)
@@ -263,16 +259,20 @@ func (c *Client) recvCTRLLoop() {
 		data := make([]byte, n)
 		copy(data, buf[:n])
 
-		// Try to deliver to SendCTRL first (non-blocking)
-		select {
-		case c.ctrlResp <- data:
-		default:
-			// SendCTRL not waiting — deliver as event
+		// To the SendCTRL waiting for a response, if any; it hands frames
+		// that are not its response over to events. Without a waiting
+		// SendCTRL the frame would sit in ctrlResp until the next one.
+		if c.ctrlWaiting.Load() {
 			select {
-			case c.events <- Event{Channel: ChannelCTRL, Data: data}:
+			case c.ctrlResp <- data:
+				continue
 			default:
-				c.log.Warn("charmux: event channel full, dropping CTRL event")
 			}
+		}
+		select {
+		case c.events <- Event{Channel: ChannelCTRL, Data: data}:
+		default:
+			c.log.Warn("charmux: event channel full, dropping CTRL event")
 		}
 	}
 }

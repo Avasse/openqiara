@@ -7,10 +7,10 @@ import (
 
 // CTRL command opcodes.
 const (
-	OpGetInfo          = 0x02
-	OpGetNet           = 0x05
-	OpGetNodes         = 0x07
-	OpStartPairRelay   = 0x15
+	OpGetInfo           = 0x02
+	OpGetNet            = 0x05
+	OpGetNodes          = 0x07
+	OpStartPairRelay    = 0x15
 	OpStartPairInternal = 0x13
 )
 
@@ -57,14 +57,6 @@ func (c *Client) GetNodes(ctx context.Context) ([]byte, error) {
 	return resp, nil
 }
 
-// PairingMode selects relay or internal pairing.
-type PairingMode byte
-
-const (
-	PairingRelay    PairingMode = OpStartPairRelay
-	PairingInternal PairingMode = OpStartPairInternal
-)
-
 // WriteConfigZone1 writes 32 bytes to MCU config zone 1 (vendor key).
 // Response opcode: 0x04.
 func (c *Client) WriteConfigZone1(ctx context.Context, data [32]byte) error {
@@ -75,24 +67,9 @@ func (c *Client) WriteConfigZone1(ctx context.Context, data [32]byte) error {
 	return err
 }
 
-// StartPairingRelay sends START_PAIRING (0x15) in relay mode.
-func (c *Client) StartPairingRelay(ctx context.Context) ([]byte, error) {
-	cmd := make([]byte, 18)
-	cmd[0] = OpStartPairRelay
-	cmd[1] = 0x01
-	cmd[5] = 0x01
-	return c.SendCTRL(ctx, cmd)
-}
-
 // StartPairingInternal sends START_PAIRING (0x13) in internal mode.
 // The vendor key must be written first via WriteConfigZone1.
 // Response opcode: 0x14.
 func (c *Client) StartPairingInternal(ctx context.Context) ([]byte, error) {
 	return c.SendCTRL(ctx, []byte{OpStartPairInternal})
-}
-
-// StopPairing sends opcode 0x16 to stop pairing mode.
-func (c *Client) StopPairing(ctx context.Context) error {
-	_, err := c.SendCTRL(ctx, []byte{0x16})
-	return err
 }

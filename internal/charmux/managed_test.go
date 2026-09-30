@@ -134,33 +134,6 @@ func TestManagedFrameRoundtrip(t *testing.T) {
 	}
 }
 
-func TestNewConfigFrame(t *testing.T) {
-	payload := []byte{0x55, 0x00, 0x03, 0x16, 0x00, 0x00, 0x00}
-	f := NewConfigFrame(23, 9, payload)
-
-	if f.GWDst != 23 {
-		t.Errorf("GWDst: got %d, want 23", f.GWDst)
-	}
-	if f.Flags != FlagZ|FlagW {
-		t.Errorf("Flags: got %04x, want %04x", f.Flags, FlagZ|FlagW)
-	}
-	if f.WFlags != 1 {
-		t.Errorf("WFlags: got %02x, want 01", f.WFlags)
-	}
-	if !bytes.Equal(f.Payload, payload) {
-		t.Errorf("Payload mismatch")
-	}
-}
-
-func TestNewBytecodeFrame(t *testing.T) {
-	payload := []byte{0x01, 0x80}
-	f := NewBytecodeFrame(7, 3, payload)
-
-	if f.WFlags != 0xCD {
-		t.Errorf("WFlags: got %02x, want CD", f.WFlags)
-	}
-}
-
 // fbxhomeFlags is the numeric value of "flags:1351ZWAE" from fbxhome logs.
 // 1351 decimal = 0x0547 = bits 0,1,2,6,8,10.
 const fbxhomeFlags uint16 = FlagZ | FlagW | FlagA | 0x0040 | 0x0100 | FlagE
@@ -329,31 +302,6 @@ func assertManagedFrameEqual(t *testing.T, got, want *ManagedFrame) {
 	}
 	if !bytes.Equal(got.Payload, want.Payload) {
 		t.Errorf("Payload: got %x, want %x", got.Payload, want.Payload)
-	}
-}
-
-func TestChunking(t *testing.T) {
-	// Verify that Serialize output can be split into 8-byte chunks
-	f := NewConfigFrame(6, 4, []byte{0x55, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00})
-	data := f.Serialize()
-
-	// Each chunk is 0x1C + up to 8 bytes
-	chunks := 0
-	for i := 0; i < len(data); i += 8 {
-		chunks++
-	}
-	if chunks == 0 {
-		t.Error("expected at least 1 chunk")
-	}
-
-	// Verify last chunk may be shorter
-	remainder := len(data) % 8
-	if remainder == 0 {
-		remainder = 8
-	}
-	lastChunkSize := remainder
-	if lastChunkSize > 8 {
-		t.Errorf("last chunk too big: %d", lastChunkSize)
 	}
 }
 
