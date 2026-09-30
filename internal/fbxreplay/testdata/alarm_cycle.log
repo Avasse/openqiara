@@ -1,0 +1,82 @@
+2020-01-02 00:00:00 [debug] Sent: [gwdst:7, gwsrc:1, cnt:1, src:1, rf_sig:0, rf_cfg:0, flags:3395ZWE, rt:7, wflags:2, payload:550f]
+2020-01-02 00:00:00 [debug] [gwdst:1, gwsrc:7, cnt:5394, src:7, rf_sig:75, rf_cfg:195, flags:134WA, ackdst:1, ackcnt:1, wflags:2, payload:550d01]
+2020-01-02 00:03:00 [debug] [gwdst:1, gwsrc:4, cnt:560, src:4, rf_sig:62, rf_cfg:164, flags:131ZW, wflags:1, payload:550124abc3034100]
+2020-01-02 00:03:00 [debug] Sent: [gwdst:4, gwsrc:1, cnt:2, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:4, ackcnt:560]
+2020-01-02 00:03:00 [info] Pir: 20 mvt start, room:  area: 
+2020-01-02 00:03:05 [debug] [gwdst:1, gwsrc:6, cnt:837, src:6, rf_sig:81, rf_cfg:208, flags:131ZW, wflags:1, payload:550127abc3030201]
+2020-01-02 00:03:05 [debug] Sent: [gwdst:6, gwsrc:1, cnt:3, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:6, ackcnt:837]
+2020-01-02 00:03:05 [debug] Sent: [gwdst:7, gwsrc:1, cnt:4, src:1, rf_sig:0, rf_cfg:0, flags:3395ZWE, rt:7, wflags:1, payload:55040a0a9605640200000000000000030000000000000003]
+2020-01-02 00:03:05 [debug] HlSrn state change from OFF to TIMEOUT_BEFORE_ARMED_SENT
+2020-01-02 00:03:05 [debug] HlKpd: KPD_DAY_ALARM
+2020-01-02 00:03:05 [debug] [gwdst:1, gwsrc:7, cnt:5395, src:7, rf_sig:75, rf_cfg:194, flags:134WA, ackdst:1, ackcnt:4, wflags:1, payload:550129abc3030002]
+2020-01-02 00:03:05 [debug] HlSrn state change from TIMEOUT_BEFORE_ARMED_SENT to TIMEOUT_BEFORE_ARMED
+2020-01-02 00:03:15 [debug] [gwdst:1, gwsrc:7, cnt:5396, src:7, rf_sig:75, rf_cfg:194, flags:131ZW, wflags:1, payload:550133abc3030003]
+2020-01-02 00:03:15 [debug] HlSrn state change from TIMEOUT_BEFORE_ARMED to ARMED
+2020-01-02 00:03:15 [debug] Sent: [gwdst:7, gwsrc:1, cnt:5, src:1, rf_sig:75, rf_cfg:194, flags:1348AE, ackdst:7, ackcnt:5396]
+2020-01-02 00:03:33 [debug] [gwdst:1, gwsrc:3, cnt:110, src:3, rf_sig:56, rf_cfg:144, flags:131ZW, wflags:1, payload:55013fabc3034000]
+2020-01-02 00:03:33 [debug] Sent: [gwdst:3, gwsrc:1, cnt:6, src:1, rf_sig:75, rf_cfg:195, flags:132A, ackdst:3, ackcnt:110]
+2020-01-02 00:03:33 [debug] Sent: [gwdst:7, gwsrc:1, cnt:7, src:1, rf_sig:12, rf_cfg:32, flags:3395ZWE, rt:7, wflags:1, payload:55050480]
+2020-01-02 00:03:33 [debug] HlSrn state change from ARMED to TIMEOUT_BEFORE_ALERT_SENT
+2020-01-02 00:03:33 [debug] [gwdst:1, gwsrc:7, cnt:5397, src:7, rf_sig:75, rf_cfg:195, flags:134WA, ackdst:1, ackcnt:7, wflags:1, payload:550145abc3030004]
+2020-01-02 00:03:33 [debug] HlSrn state change from TIMEOUT_BEFORE_ALERT_SENT to TIMEOUT_BEFORE_ALERT
+2020-01-02 00:03:34 [debug] [gwdst:1, gwsrc:3, cnt:111, src:3, rf_sig:50, rf_cfg:128, flags:131ZW, wflags:1, payload:550140abc3030001]
+2020-01-02 00:03:34 [debug] Sent: [gwdst:3, gwsrc:1, cnt:8, src:1, rf_sig:43, rf_cfg:114, flags:132A, ackdst:3, ackcnt:111]
+2020-01-02 00:03:35 [debug] [gwdst:1, gwsrc:3, cnt:112, src:3, rf_sig:50, rf_cfg:128, flags:131ZW, wflags:1, payload:550141abc3030001]
+2020-01-02 00:03:35 [debug] Sent: [gwdst:3, gwsrc:1, cnt:9, src:1, rf_sig:75, rf_cfg:195, flags:132A, ackdst:3, ackcnt:112]
+2020-01-02 00:03:43 [debug] [gwdst:1, gwsrc:7, cnt:5398, src:7, rf_sig:75, rf_cfg:195, flags:131ZW, wflags:1, payload:55014fabc3030005]
+2020-01-02 00:03:43 [debug] HlSrn state change from TIMEOUT_BEFORE_ALERT to ALERT_WITH_SRN
+2020-01-02 00:03:43 [debug] Sent: [gwdst:7, gwsrc:1, cnt:10, src:1, rf_sig:75, rf_cfg:195, flags:1348AE, ackdst:7, ackcnt:5398]
+2020-01-02 00:03:48 [debug] DomusNode(Sirène): manage 11 -> 12
+2020-01-02 00:03:48 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:11, src:1, rf_sig:12, rf_cfg:32, flags:2179ZW, rt:7, wflags:12GM, payload:08]
+2020-01-02 00:03:48 [debug] DomusNode(Sirène): manage 12 -> 12
+2020-01-02 00:03:48 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:12, src:1, rf_sig:12, rf_cfg:32, flags:2179ZW, rt:7, wflags:12GM, payload:08]
+2020-01-02 00:03:48 [debug] [gwdst:1, gwsrc:7, cnt:5400, src:7, rf_sig:75, rf_cfg:195, flags:135ZWA, ackdst:1, ackcnt:12, wflags:1M, payload:8008e7aab7eced2e4563]
+2020-01-02 00:03:48 [debug] DomusNode(Sirène): manage 12 -> 11
+2020-01-02 00:03:48 [debug] DomusNode(Sirène): manage 11 -> 13
+2020-01-02 00:03:48 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:13, src:1, rf_sig:50, rf_cfg:128, flags:6WA, ackdst:7, ackcnt:5400, wflags:5M, payload:83e81ea4]
+2020-01-02 00:03:49 [debug] [gwdst:1, gwsrc:1, cnt:8724367, src:1, rf_sig:62, rf_cfg:164, flags:64, reason:UNREACHABLE, waitsrc:1, waitcnt:13]
+2020-01-02 00:03:49 [debug] [gwdst:1, gwsrc:1, cnt:8724368, src:1, rf_sig:62, rf_cfg:164, flags:64, reason:UNREACHABLE, waitsrc:1, waitcnt:11]
+2020-01-02 00:03:59 [debug] [gwdst:1, gwsrc:4, cnt:561, src:4, rf_sig:62, rf_cfg:164, flags:131ZW, wflags:1, payload:55015fabc3034101]
+2020-01-02 00:03:59 [debug] Sent: [gwdst:4, gwsrc:1, cnt:14, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:4, ackcnt:561]
+2020-01-02 00:03:59 [info] Pir: 20 mvt end, room:  area: 
+2020-01-02 00:03:59 [debug] [gwdst:1, gwsrc:7, cnt:5633, src:7, rf_sig:75, rf_cfg:198, flags:131ZW, wflags:2M, payload:f10001]
+2020-01-02 00:03:59 [debug] DomusNode (Sirène) need time
+2020-01-02 00:03:59 [debug] DomusNode (Sirène) need bytecode
+2020-01-02 00:03:59 [debug] DomusNode (Sirène) need status 
+2020-01-02 00:03:59 [debug] DomusNode(Sirène): manage 13 -> 12
+2020-01-02 00:03:59 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:15, src:1, rf_sig:75, rf_cfg:195, flags:1351ZWAE, ackdst:7, ackcnt:5633, wflags:12GM, payload:78]
+2020-01-02 00:04:00 [debug] [gwdst:1, gwsrc:7, cnt:5634, src:7, rf_sig:75, rf_cfg:198, flags:135ZWA, ackdst:1, ackcnt:15, wflags:1M, payload:d178e7aab7eced2e4563000000000000000000]
+2020-01-02 00:04:00 [debug] node 32 change state from DOMUS_NODE_US_UNKNOWN to DOMUS_NODE_US_NONE_OK
+2020-01-02 00:04:00 [debug] DomusNode(Sirène): manage 12 -> 11
+2020-01-02 00:04:00 [debug] DomusNode(Sirène): manage 11 -> 13
+2020-01-02 00:04:00 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:16, src:1, rf_sig:18, rf_cfg:52, flags:1351ZWAE, ackdst:7, ackcnt:5634, wflags:13GM, payload:0180888700000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:00 [debug] [gwdst:1, gwsrc:7, cnt:5635, src:7, rf_sig:75, rf_cfg:197, flags:135ZWA, ackdst:1, ackcnt:16, wflags:1M, payload:0f00000000]
+2020-01-02 00:04:00 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:17, src:1, rf_sig:12, rf_cfg:32, flags:1351ZWAE, ackdst:7, ackcnt:5635, wflags:13GM, payload:018780000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:00 [debug] [gwdst:1, gwsrc:7, cnt:5636, src:7, rf_sig:75, rf_cfg:197, flags:135ZWA, ackdst:1, ackcnt:17, wflags:1M, payload:0300000000]
+2020-01-02 00:04:00 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:18, src:1, rf_sig:12, rf_cfg:32, flags:1351ZWAE, ackdst:7, ackcnt:5636, wflags:13GM, payload:018700010000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400100004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:00 [debug] [gwdst:1, gwsrc:7, cnt:5637, src:7, rf_sig:75, rf_cfg:196, flags:135ZWA, ackdst:1, ackcnt:18, wflags:1M, payload:0300000000]
+2020-01-02 00:04:00 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:19, src:1, rf_sig:75, rf_cfg:197, flags:1351ZWAE, ackdst:7, ackcnt:5637, wflags:13GM, payload:018780010000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00100004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:01 [debug] [gwdst:1, gwsrc:7, cnt:5638, src:7, rf_sig:75, rf_cfg:196, flags:135ZWA, ackdst:1, ackcnt:19, wflags:1M, payload:0300000000]
+2020-01-02 00:04:01 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:20, src:1, rf_sig:75, rf_cfg:196, flags:1351ZWAE, ackdst:7, ackcnt:5638, wflags:13GM, payload:018700020000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400200004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:01 [debug] [gwdst:1, gwsrc:7, cnt:5639, src:7, rf_sig:75, rf_cfg:196, flags:135ZWA, ackdst:1, ackcnt:20, wflags:1M, payload:0300000000]
+2020-01-02 00:04:01 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:21, src:1, rf_sig:75, rf_cfg:196, flags:1351ZWAE, ackdst:7, ackcnt:5639, wflags:13GM, payload:018780020000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00200004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:01 [debug] [gwdst:1, gwsrc:7, cnt:5640, src:7, rf_sig:75, rf_cfg:196, flags:135ZWA, ackdst:1, ackcnt:21, wflags:1M, payload:0300000000]
+2020-01-02 00:04:01 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:22, src:1, rf_sig:75, rf_cfg:196, flags:1351ZWAE, ackdst:7, ackcnt:5640, wflags:13GM, payload:018700030000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400300004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:01 [debug] [gwdst:1, gwsrc:7, cnt:5641, src:7, rf_sig:75, rf_cfg:195, flags:135ZWA, ackdst:1, ackcnt:22, wflags:1M, payload:0300000000]
+2020-01-02 00:04:01 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:23, src:1, rf_sig:75, rf_cfg:196, flags:1351ZWAE, ackdst:7, ackcnt:5641, wflags:13GM, payload:018780030000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00300004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:01 [debug] [gwdst:1, gwsrc:7, cnt:5642, src:7, rf_sig:75, rf_cfg:195, flags:135ZWA, ackdst:1, ackcnt:23, wflags:1M, payload:0300000000]
+2020-01-02 00:04:01 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:24, src:1, rf_sig:75, rf_cfg:195, flags:1351ZWAE, ackdst:7, ackcnt:5642, wflags:13GM, payload:018700040000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400400004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-02 00:04:02 [debug] [gwdst:1, gwsrc:7, cnt:5643, src:7, rf_sig:75, rf_cfg:195, flags:135ZWA, ackdst:1, ackcnt:24, wflags:1M, payload:0300000000]
+2020-01-02 00:04:02 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:25, src:1, rf_sig:75, rf_cfg:195, flags:1351ZWAE, ackdst:7, ackcnt:5643, wflags:13GM, payload:018780040000010087d8000080040000000082000008000000]
+2020-01-02 00:04:02 [debug] [gwdst:1, gwsrc:7, cnt:5644, src:7, rf_sig:75, rf_cfg:195, flags:135ZWA, ackdst:1, ackcnt:25, wflags:1M, payload:0700000000]
+2020-01-02 00:04:02 [info] Node 32 type Node.DomusNode.HlSrn bytecode started
+2020-01-02 00:04:02 [debug] DomusNode(Sirène): manage 13 -> 11
+2020-01-02 00:04:02 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:26, src:1, rf_sig:75, rf_cfg:195, flags:1351ZWAE, ackdst:7, ackcnt:5644, wflags:8GM, payload:62abc303]
+2020-01-02 00:04:02 [debug] [gwdst:1, gwsrc:7, cnt:5645, src:7, rf_sig:75, rf_cfg:194, flags:133ZA, ackdst:1, ackcnt:26]
+2020-01-02 00:04:02 [debug] HLsrn get state sent
+2020-01-02 00:04:02 [debug] HlSrn state change from ALERT_WITH_SRN to GET_STATE_SENT
+2020-01-02 00:04:02 [debug] Sent manage: [gwdst:7, gwsrc:1, cnt:27, src:1, rf_sig:75, rf_cfg:195, flags:1351ZWAE, ackdst:7, ackcnt:5645, wflags:1, payload:5506]
+2020-01-02 00:04:02 [debug] [gwdst:1, gwsrc:7, cnt:5646, src:7, rf_sig:75, rf_cfg:194, flags:134WA, ackdst:1, ackcnt:27, wflags:1, payload:550162abc3030000]
+2020-01-02 00:04:02 [debug] HlSrn state change from GET_STATE_SENT to OFF
+2020-01-02 00:04:02 [debug] Sent: [gwdst:7, gwsrc:1, cnt:28, src:1, rf_sig:75, rf_cfg:194, flags:3395ZWE, rt:7, wflags:2, payload:550f]
+2020-01-02 00:04:02 [debug] [gwdst:1, gwsrc:7, cnt:5647, src:7, rf_sig:75, rf_cfg:194, flags:134WA, ackdst:1, ackcnt:28, wflags:2, payload:550d01]

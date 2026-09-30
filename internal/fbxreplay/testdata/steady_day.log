@@ -1,0 +1,440 @@
+2020-01-01 00:00:00 [info] fbxhome started
+2020-01-01 00:00:06 [info] fbxhome started
+2020-01-01 00:00:09 [debug] DomusAdapterMux, domus network started
+2020-01-01 00:00:09 [debug] Sent: [gwdst:6, gwsrc:1, cnt:0, src:1, rf_sig:0, rf_cfg:0, flags:3395ZWE, rt:6, wflags:1, payload:5506]
+2020-01-01 00:00:09 [debug] HlSrn state change from OFF to GET_STATE_SENT
+2020-01-01 00:00:09 [debug] [gwdst:1, gwsrc:6, cnt:22565, src:6, rf_sig:93, rf_cfg:240, flags:134WA, ackdst:1, ackcnt:0, wflags:1, payload:5501f958c2030000]
+2020-01-01 00:00:09 [debug] HlSrn state change from GET_STATE_SENT to OFF
+2020-01-01 00:00:09 [debug] Sent: [gwdst:6, gwsrc:1, cnt:1, src:1, rf_sig:0, rf_cfg:0, flags:3395ZWE, rt:6, wflags:2, payload:550f]
+2020-01-01 00:00:09 [debug] [gwdst:1, gwsrc:6, cnt:22566, src:6, rf_sig:93, rf_cfg:240, flags:134WA, ackdst:1, ackcnt:1, wflags:2, payload:550d01]
+2020-01-01 00:04:45 [debug] [gwdst:1, gwsrc:3, cnt:13794, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:2M, payload:81ff]
+2020-01-01 00:04:45 [debug] HlPir::set_battery_level 255
+2020-01-01 00:04:45 [debug] DomusNode (Capteur de mouvement) need status 
+2020-01-01 00:04:45 [debug] DomusNode(Capteur de mouvement): manage 11 -> 12
+2020-01-01 00:04:45 [debug] Sent manage: [gwdst:3, gwsrc:1, cnt:2, src:1, rf_sig:37, rf_cfg:102, flags:1351ZWAE, ackdst:3, ackcnt:13794, wflags:12GM, payload:78]
+2020-01-01 00:04:46 [debug] [gwdst:1, gwsrc:3, cnt:13795, src:3, rf_sig:93, rf_cfg:240, flags:135ZWA, ackdst:1, ackcnt:2, wflags:1M, payload:81780e901e47590999cbd0a9e327488c8e46ff]
+2020-01-01 00:04:46 [debug] HlPir::set_battery_level 255
+2020-01-01 00:04:46 [debug] node 17 change state from DOMUS_NODE_US_UNKNOWN to DOMUS_NODE_US_NONE_OK
+2020-01-01 00:04:46 [debug] DomusNode(Capteur de mouvement): manage 12 -> 11
+2020-01-01 00:04:46 [debug] HlPir send config to node
+2020-01-01 00:04:46 [debug] Sent manage: [gwdst:3, gwsrc:1, cnt:3, src:1, rf_sig:93, rf_cfg:240, flags:1351ZWAE, ackdst:3, ackcnt:13795, wflags:1, payload:55000106000000]
+2020-01-01 00:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22567, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 00:20:09 [debug] [gwdst:1, gwsrc:6, cnt:22568, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 00:30:10 [debug] [gwdst:1, gwsrc:6, cnt:22569, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 00:40:10 [debug] [gwdst:1, gwsrc:6, cnt:22570, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 00:50:10 [debug] [gwdst:1, gwsrc:6, cnt:22571, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 01:00:10 [debug] [gwdst:1, gwsrc:6, cnt:22572, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 01:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22573, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 01:20:10 [debug] [gwdst:1, gwsrc:6, cnt:22574, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 01:30:10 [debug] [gwdst:1, gwsrc:6, cnt:22575, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 01:40:10 [debug] [gwdst:1, gwsrc:6, cnt:22576, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 01:50:10 [debug] [gwdst:1, gwsrc:6, cnt:22577, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 02:00:10 [debug] [gwdst:1, gwsrc:6, cnt:22578, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 02:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22579, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 02:20:10 [debug] [gwdst:1, gwsrc:6, cnt:22580, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 02:30:10 [debug] [gwdst:1, gwsrc:6, cnt:22581, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 02:40:10 [debug] [gwdst:1, gwsrc:6, cnt:22582, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 02:47:41 [debug] [gwdst:1, gwsrc:5, cnt:1237, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:2M, payload:81ff]
+2020-01-01 02:47:41 [debug] HlDws: set_battery_level (255)
+2020-01-01 02:47:41 [debug] DomusNode (Détecteur d'ouverture) need status 
+2020-01-01 02:47:41 [debug] DomusNode(Détecteur d'ouverture): manage 11 -> 12
+2020-01-01 02:47:41 [debug] Sent manage: [gwdst:5, gwsrc:1, cnt:4, src:1, rf_sig:31, rf_cfg:93, flags:1351ZWAE, ackdst:5, ackcnt:1237, wflags:12GM, payload:78]
+2020-01-01 02:47:41 [debug] [gwdst:1, gwsrc:5, cnt:1238, src:5, rf_sig:37, rf_cfg:96, flags:135ZWA, ackdst:1, ackcnt:4, wflags:1M, payload:817848654bf742f5070e932f56223f735a6bff]
+2020-01-01 02:47:41 [debug] HlDws: set_battery_level (255)
+2020-01-01 02:47:41 [debug] node 23 change state from DOMUS_NODE_US_UNKNOWN to DOMUS_NODE_US_NONE_OK
+2020-01-01 02:47:41 [debug] DomusNode(Détecteur d'ouverture): manage 12 -> 11
+2020-01-01 02:47:41 [debug] Hldws send config to node
+2020-01-01 02:47:41 [debug] Sent manage: [gwdst:5, gwsrc:1, cnt:5, src:1, rf_sig:37, rf_cfg:96, flags:1351ZWAE, ackdst:5, ackcnt:1238, wflags:1, payload:55000206000000]
+2020-01-01 02:50:10 [debug] [gwdst:1, gwsrc:6, cnt:22583, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 03:00:10 [debug] [gwdst:1, gwsrc:6, cnt:22584, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 03:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22585, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 03:11:32 [debug] [gwdst:1, gwsrc:2, cnt:637, src:2, rf_sig:56, rf_cfg:144, flags:131ZW, wflags:2M, payload:81ff]
+2020-01-01 03:11:32 [debug] HLKpd::set_battery_level 255
+2020-01-01 03:11:32 [debug] DomusNode (Clavier de déverrouillage) need status 
+2020-01-01 03:11:32 [debug] DomusNode(Clavier de déverrouillage): manage 11 -> 12
+2020-01-01 03:11:32 [debug] Sent manage: [gwdst:2, gwsrc:1, cnt:6, src:1, rf_sig:31, rf_cfg:93, flags:1351ZWAE, ackdst:2, ackcnt:637, wflags:12GM, payload:78]
+2020-01-01 03:11:33 [debug] [gwdst:1, gwsrc:2, cnt:638, src:2, rf_sig:56, rf_cfg:144, flags:135ZWA, ackdst:1, ackcnt:6, wflags:1M, payload:81789c80fd8e4fa28e5d0ca70a62a08c5c36ff]
+2020-01-01 03:11:33 [debug] HLKpd::set_battery_level 255
+2020-01-01 03:11:33 [debug] node 14 change state from DOMUS_NODE_US_UNKNOWN to DOMUS_NODE_US_NONE_OK
+2020-01-01 03:11:33 [debug] DomusNode(Clavier de déverrouillage): manage 12 -> 11
+2020-01-01 03:11:33 [debug] HLKpd send config to node
+2020-01-01 03:11:33 [debug] Sent manage: [gwdst:2, gwsrc:1, cnt:7, src:1, rf_sig:56, rf_cfg:144, flags:1351ZWAE, ackdst:2, ackcnt:638, wflags:1, payload:55000006000000]
+2020-01-01 03:11:33 [debug] [gwdst:1, gwsrc:2, cnt:640, src:2, rf_sig:56, rf_cfg:144, flags:131ZW, wflags:1, payload:5509]
+2020-01-01 03:11:33 [debug] Sent: [gwdst:2, gwsrc:1, cnt:8, src:1, rf_sig:56, rf_cfg:144, flags:1351ZWAE, ackdst:2, ackcnt:640, wflags:1, payload:030004aaaa]
+2020-01-01 03:20:10 [debug] [gwdst:1, gwsrc:6, cnt:22586, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 03:30:10 [debug] [gwdst:1, gwsrc:6, cnt:22587, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 03:40:10 [debug] [gwdst:1, gwsrc:6, cnt:22588, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 03:50:10 [debug] [gwdst:1, gwsrc:6, cnt:22589, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 04:00:10 [debug] [gwdst:1, gwsrc:6, cnt:22590, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 04:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22591, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 04:20:10 [debug] [gwdst:1, gwsrc:6, cnt:22592, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 04:30:10 [debug] [gwdst:1, gwsrc:6, cnt:22593, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 04:40:10 [debug] [gwdst:1, gwsrc:6, cnt:22594, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 04:50:10 [debug] [gwdst:1, gwsrc:6, cnt:22595, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 05:00:10 [debug] [gwdst:1, gwsrc:6, cnt:22596, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 05:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22597, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 05:20:10 [debug] [gwdst:1, gwsrc:6, cnt:22598, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 05:30:10 [debug] [gwdst:1, gwsrc:6, cnt:22599, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 05:40:10 [debug] [gwdst:1, gwsrc:6, cnt:22600, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 05:50:10 [debug] [gwdst:1, gwsrc:6, cnt:22601, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 06:00:10 [debug] [gwdst:1, gwsrc:6, cnt:22602, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 06:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22603, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 06:20:10 [debug] [gwdst:1, gwsrc:6, cnt:22604, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 06:30:10 [debug] [gwdst:1, gwsrc:6, cnt:22605, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 06:40:10 [debug] [gwdst:1, gwsrc:6, cnt:22606, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 06:50:10 [debug] [gwdst:1, gwsrc:6, cnt:22607, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 07:00:10 [debug] [gwdst:1, gwsrc:6, cnt:22608, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 07:10:10 [debug] [gwdst:1, gwsrc:6, cnt:22609, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 07:20:11 [debug] [gwdst:1, gwsrc:6, cnt:22610, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 07:30:11 [debug] [gwdst:1, gwsrc:6, cnt:22611, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 07:40:11 [debug] [gwdst:1, gwsrc:6, cnt:22612, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 07:50:11 [debug] [gwdst:1, gwsrc:6, cnt:22613, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 08:00:11 [debug] [gwdst:1, gwsrc:6, cnt:22614, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 08:10:11 [debug] [gwdst:1, gwsrc:6, cnt:22615, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 08:20:11 [debug] [gwdst:1, gwsrc:6, cnt:22616, src:6, rf_sig:93, rf_cfg:240, flags:130W, wflags:1, payload:550e]
+2020-01-01 08:29:10 [debug] DomusNode(Sirène): manage 11 -> 12
+2020-01-01 08:29:10 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:9, src:1, rf_sig:12, rf_cfg:32, flags:2179ZW, rt:6, wflags:12GM, payload:08]
+2020-01-01 08:29:10 [debug] DomusNode(Sirène): manage 12 -> 12
+2020-01-01 08:29:10 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:10, src:1, rf_sig:12, rf_cfg:32, flags:2179ZW, rt:6, wflags:12GM, payload:08]
+2020-01-01 08:29:11 [debug] [gwdst:1, gwsrc:6, cnt:22618, src:6, rf_sig:93, rf_cfg:241, flags:135ZWA, ackdst:1, ackcnt:10, wflags:1M, payload:8008e7aab7eced2e4563]
+2020-01-01 08:29:11 [debug] DomusNode(Sirène): manage 12 -> 11
+2020-01-01 08:29:11 [debug] DomusNode(Sirène): manage 11 -> 13
+2020-01-01 08:29:11 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:11, src:1, rf_sig:93, rf_cfg:240, flags:6WA, ackdst:6, ackcnt:22618, wflags:5M, payload:0a403b69]
+2020-01-01 08:29:11 [debug] [gwdst:1, gwsrc:1, cnt:8807242, src:1, rf_sig:93, rf_cfg:243, flags:64, reason:UNREACHABLE, waitsrc:1, waitcnt:11]
+2020-01-01 08:29:12 [debug] [gwdst:1, gwsrc:1, cnt:8807243, src:1, rf_sig:93, rf_cfg:244, flags:64, reason:UNREACHABLE, waitsrc:1, waitcnt:9]
+2020-01-01 08:29:20 [debug] [gwdst:1, gwsrc:6, cnt:22785, src:6, rf_sig:93, rf_cfg:244, flags:131ZW, wflags:2M, payload:f10001]
+2020-01-01 08:29:20 [debug] DomusNode (Sirène) need time
+2020-01-01 08:29:20 [debug] DomusNode (Sirène) need bytecode
+2020-01-01 08:29:20 [debug] DomusNode (Sirène) need status 
+2020-01-01 08:29:20 [debug] DomusNode(Sirène): manage 13 -> 12
+2020-01-01 08:29:20 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:12, src:1, rf_sig:93, rf_cfg:241, flags:1351ZWAE, ackdst:6, ackcnt:22785, wflags:12GM, payload:78]
+2020-01-01 08:29:20 [debug] [gwdst:1, gwsrc:6, cnt:22786, src:6, rf_sig:93, rf_cfg:244, flags:135ZWA, ackdst:1, ackcnt:12, wflags:1M, payload:d178e7aab7eced2e4563000000000000000000]
+2020-01-01 08:29:20 [debug] node 29 change state from DOMUS_NODE_US_UNKNOWN to DOMUS_NODE_US_NONE_OK
+2020-01-01 08:29:20 [debug] DomusNode(Sirène): manage 12 -> 11
+2020-01-01 08:29:20 [debug] DomusNode(Sirène): manage 11 -> 13
+2020-01-01 08:29:20 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:13, src:1, rf_sig:0, rf_cfg:1, flags:1351ZWAE, ackdst:6, ackcnt:22786, wflags:13GM, payload:0180888700000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:21 [debug] [gwdst:1, gwsrc:6, cnt:22787, src:6, rf_sig:93, rf_cfg:244, flags:135ZWA, ackdst:1, ackcnt:13, wflags:1M, payload:0f00000000]
+2020-01-01 08:29:21 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:14, src:1, rf_sig:0, rf_cfg:0, flags:1351ZWAE, ackdst:6, ackcnt:22787, wflags:13GM, payload:018780000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:21 [debug] [gwdst:1, gwsrc:6, cnt:22788, src:6, rf_sig:93, rf_cfg:243, flags:135ZWA, ackdst:1, ackcnt:14, wflags:1M, payload:0300000000]
+2020-01-01 08:29:21 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:15, src:1, rf_sig:0, rf_cfg:0, flags:1351ZWAE, ackdst:6, ackcnt:22788, wflags:13GM, payload:018700010000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400100004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:21 [debug] [gwdst:1, gwsrc:6, cnt:22789, src:6, rf_sig:93, rf_cfg:243, flags:135ZWA, ackdst:1, ackcnt:15, wflags:1M, payload:0300000000]
+2020-01-01 08:29:21 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:16, src:1, rf_sig:93, rf_cfg:243, flags:1351ZWAE, ackdst:6, ackcnt:22789, wflags:13GM, payload:018780010000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00100004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:21 [debug] [gwdst:1, gwsrc:6, cnt:22790, src:6, rf_sig:93, rf_cfg:243, flags:135ZWA, ackdst:1, ackcnt:16, wflags:1M, payload:0300000000]
+2020-01-01 08:29:21 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:17, src:1, rf_sig:93, rf_cfg:243, flags:1351ZWAE, ackdst:6, ackcnt:22790, wflags:13GM, payload:018700020000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400200004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:21 [debug] [gwdst:1, gwsrc:6, cnt:22791, src:6, rf_sig:93, rf_cfg:243, flags:135ZWA, ackdst:1, ackcnt:17, wflags:1M, payload:0300000000]
+2020-01-01 08:29:21 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:18, src:1, rf_sig:93, rf_cfg:243, flags:1351ZWAE, ackdst:6, ackcnt:22791, wflags:13GM, payload:018780020000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00200004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:21 [debug] [gwdst:1, gwsrc:6, cnt:22792, src:6, rf_sig:93, rf_cfg:242, flags:135ZWA, ackdst:1, ackcnt:18, wflags:1M, payload:0300000000]
+2020-01-01 08:29:21 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:19, src:1, rf_sig:93, rf_cfg:243, flags:1351ZWAE, ackdst:6, ackcnt:22792, wflags:13GM, payload:018700030000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400300004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:22 [debug] [gwdst:1, gwsrc:6, cnt:22793, src:6, rf_sig:93, rf_cfg:242, flags:135ZWA, ackdst:1, ackcnt:19, wflags:1M, payload:0300000000]
+2020-01-01 08:29:22 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:20, src:1, rf_sig:93, rf_cfg:242, flags:1351ZWAE, ackdst:6, ackcnt:22793, wflags:13GM, payload:018780030000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087c00300004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:22 [debug] [gwdst:1, gwsrc:6, cnt:22794, src:6, rf_sig:93, rf_cfg:242, flags:135ZWA, ackdst:1, ackcnt:20, wflags:1M, payload:0300000000]
+2020-01-01 08:29:22 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:21, src:1, rf_sig:93, rf_cfg:242, flags:1351ZWAE, ackdst:6, ackcnt:22794, wflags:13GM, payload:018700040000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087400400004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000]
+2020-01-01 08:29:22 [debug] [gwdst:1, gwsrc:6, cnt:22795, src:6, rf_sig:93, rf_cfg:242, flags:135ZWA, ackdst:1, ackcnt:21, wflags:1M, payload:0300000000]
+2020-01-01 08:29:22 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:22, src:1, rf_sig:93, rf_cfg:242, flags:1351ZWAE, ackdst:6, ackcnt:22795, wflags:13GM, payload:018780040000010087d8000080040000000082000008000000]
+2020-01-01 08:29:22 [debug] [gwdst:1, gwsrc:6, cnt:22796, src:6, rf_sig:93, rf_cfg:242, flags:135ZWA, ackdst:1, ackcnt:22, wflags:1M, payload:0700000000]
+2020-01-01 08:29:22 [info] Node 29 type Node.DomusNode.HlSrn bytecode started
+2020-01-01 08:29:22 [debug] DomusNode(Sirène): manage 13 -> 11
+2020-01-01 08:29:22 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:23, src:1, rf_sig:93, rf_cfg:242, flags:1351ZWAE, ackdst:6, ackcnt:22796, wflags:8GM, payload:52d0c203]
+2020-01-01 08:29:22 [debug] [gwdst:1, gwsrc:6, cnt:22797, src:6, rf_sig:93, rf_cfg:242, flags:133ZA, ackdst:1, ackcnt:23]
+2020-01-01 08:29:22 [debug] HLsrn get state sent
+2020-01-01 08:29:22 [debug] HlSrn state change from OFF to GET_STATE_SENT
+2020-01-01 08:29:22 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:24, src:1, rf_sig:93, rf_cfg:242, flags:1351ZWAE, ackdst:6, ackcnt:22797, wflags:1, payload:5506]
+2020-01-01 08:29:22 [debug] [gwdst:1, gwsrc:6, cnt:22798, src:6, rf_sig:93, rf_cfg:241, flags:134WA, ackdst:1, ackcnt:24, wflags:1, payload:550152d0c2030000]
+2020-01-01 08:29:22 [debug] HlSrn state change from GET_STATE_SENT to OFF
+2020-01-01 08:29:22 [debug] Sent: [gwdst:6, gwsrc:1, cnt:25, src:1, rf_sig:93, rf_cfg:242, flags:3395ZWE, rt:6, wflags:2, payload:550f]
+2020-01-01 08:29:23 [debug] [gwdst:1, gwsrc:6, cnt:22799, src:6, rf_sig:93, rf_cfg:241, flags:134WA, ackdst:1, ackcnt:25, wflags:2, payload:550d01]
+2020-01-01 08:35:07 [debug] [gwdst:1, gwsrc:5, cnt:1240, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:55019cd1c2034200]
+2020-01-01 08:35:07 [debug] Sent: [gwdst:5, gwsrc:1, cnt:26, src:1, rf_sig:37, rf_cfg:96, flags:132A, ackdst:5, ackcnt:1240]
+2020-01-01 08:35:07 [debug] [gwdst:1, gwsrc:5, cnt:1241, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:55019dd1c2030201]
+2020-01-01 08:35:07 [debug] Sent: [gwdst:5, gwsrc:1, cnt:27, src:1, rf_sig:93, rf_cfg:244, flags:132A, ackdst:5, ackcnt:1241]
+2020-01-01 08:35:08 [debug] [gwdst:1, gwsrc:5, cnt:1242, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:55019ed1c2034200]
+2020-01-01 08:35:08 [debug] Sent: [gwdst:5, gwsrc:1, cnt:28, src:1, rf_sig:12, rf_cfg:47, flags:132A, ackdst:5, ackcnt:1242]
+2020-01-01 08:35:29 [debug] [gwdst:1, gwsrc:5, cnt:1243, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:5501b3d1c2030201]
+2020-01-01 08:35:29 [debug] Sent: [gwdst:5, gwsrc:1, cnt:29, src:1, rf_sig:43, rf_cfg:113, flags:132A, ackdst:5, ackcnt:1243]
+2020-01-01 08:39:23 [debug] [gwdst:1, gwsrc:6, cnt:22800, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 08:44:50 [debug] [gwdst:1, gwsrc:3, cnt:13797, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501f0d3c2034100]
+2020-01-01 08:44:50 [debug] Sent: [gwdst:3, gwsrc:1, cnt:30, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13797]
+2020-01-01 08:44:50 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 08:45:10 [debug] [gwdst:1, gwsrc:3, cnt:13798, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550104d4c2034101]
+2020-01-01 08:45:10 [debug] Sent: [gwdst:3, gwsrc:1, cnt:31, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:3, ackcnt:13798]
+2020-01-01 08:45:10 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 08:49:23 [debug] [gwdst:1, gwsrc:6, cnt:22801, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 08:52:46 [debug] [gwdst:1, gwsrc:5, cnt:1244, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:5501c0d5c2034200]
+2020-01-01 08:52:46 [debug] Sent: [gwdst:5, gwsrc:1, cnt:32, src:1, rf_sig:31, rf_cfg:93, flags:132A, ackdst:5, ackcnt:1244]
+2020-01-01 08:52:52 [debug] [gwdst:1, gwsrc:5, cnt:1245, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:5501c5d5c2030201]
+2020-01-01 08:52:52 [debug] Sent: [gwdst:5, gwsrc:1, cnt:33, src:1, rf_sig:37, rf_cfg:96, flags:132A, ackdst:5, ackcnt:1245]
+2020-01-01 08:53:37 [debug] [gwdst:1, gwsrc:3, cnt:13799, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501ffd5c2034100]
+2020-01-01 08:53:37 [debug] Sent: [gwdst:3, gwsrc:1, cnt:34, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:3, ackcnt:13799]
+2020-01-01 08:53:37 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 08:53:57 [debug] [gwdst:1, gwsrc:3, cnt:13800, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550113d6c2034101]
+2020-01-01 08:53:57 [debug] Sent: [gwdst:3, gwsrc:1, cnt:35, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:3, ackcnt:13800]
+2020-01-01 08:53:57 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 08:56:34 [debug] [gwdst:1, gwsrc:3, cnt:13801, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501b0d6c2034100]
+2020-01-01 08:56:34 [debug] Sent: [gwdst:3, gwsrc:1, cnt:36, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:3, ackcnt:13801]
+2020-01-01 08:56:34 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 08:56:54 [debug] [gwdst:1, gwsrc:3, cnt:13802, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501c4d6c2034101]
+2020-01-01 08:56:54 [debug] Sent: [gwdst:3, gwsrc:1, cnt:37, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:3, ackcnt:13802]
+2020-01-01 08:56:54 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 08:57:23 [debug] [gwdst:1, gwsrc:3, cnt:13803, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501e1d6c2034100]
+2020-01-01 08:57:23 [debug] Sent: [gwdst:3, gwsrc:1, cnt:38, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:3, ackcnt:13803]
+2020-01-01 08:57:23 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 08:57:43 [debug] [gwdst:1, gwsrc:3, cnt:13804, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501f5d6c2034101]
+2020-01-01 08:57:43 [debug] Sent: [gwdst:3, gwsrc:1, cnt:39, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13804]
+2020-01-01 08:57:43 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 08:59:23 [debug] [gwdst:1, gwsrc:6, cnt:22802, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 08:59:33 [debug] [gwdst:1, gwsrc:3, cnt:13805, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550164d7c2034100]
+2020-01-01 08:59:33 [debug] Sent: [gwdst:3, gwsrc:1, cnt:40, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13805]
+2020-01-01 08:59:33 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:02:36 [debug] [gwdst:1, gwsrc:3, cnt:13806, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55011bd8c2034101]
+2020-01-01 09:02:36 [debug] Sent: [gwdst:3, gwsrc:1, cnt:41, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13806]
+2020-01-01 09:02:36 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:06:17 [debug] [gwdst:1, gwsrc:3, cnt:13807, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501f7d8c2034100]
+2020-01-01 09:06:17 [debug] Sent: [gwdst:3, gwsrc:1, cnt:42, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13807]
+2020-01-01 09:06:17 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:06:37 [debug] [gwdst:1, gwsrc:3, cnt:13808, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55010bd9c2034101]
+2020-01-01 09:06:37 [debug] Sent: [gwdst:3, gwsrc:1, cnt:43, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13808]
+2020-01-01 09:06:37 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:06:46 [debug] [gwdst:1, gwsrc:3, cnt:13809, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550114d9c2034100]
+2020-01-01 09:06:46 [debug] Sent: [gwdst:3, gwsrc:1, cnt:44, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13809]
+2020-01-01 09:06:46 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:07:06 [debug] [gwdst:1, gwsrc:3, cnt:13810, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550128d9c2034101]
+2020-01-01 09:07:06 [debug] Sent: [gwdst:3, gwsrc:1, cnt:45, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13810]
+2020-01-01 09:07:06 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:07:11 [debug] [gwdst:1, gwsrc:3, cnt:13811, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55012dd9c2034100]
+2020-01-01 09:07:11 [debug] Sent: [gwdst:3, gwsrc:1, cnt:46, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13811]
+2020-01-01 09:07:11 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:07:40 [debug] [gwdst:1, gwsrc:3, cnt:13812, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55014bd9c2034101]
+2020-01-01 09:07:40 [debug] Sent: [gwdst:3, gwsrc:1, cnt:47, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13812]
+2020-01-01 09:07:40 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:09:23 [debug] [gwdst:1, gwsrc:6, cnt:22803, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 09:10:14 [debug] [gwdst:1, gwsrc:3, cnt:13813, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501e5d9c2034100]
+2020-01-01 09:10:14 [debug] Sent: [gwdst:3, gwsrc:1, cnt:48, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13813]
+2020-01-01 09:10:14 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:10:45 [debug] [gwdst:1, gwsrc:3, cnt:13814, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550103dac2034101]
+2020-01-01 09:10:45 [debug] Sent: [gwdst:3, gwsrc:1, cnt:49, src:1, rf_sig:37, rf_cfg:97, flags:1348AE, ackdst:3, ackcnt:13814]
+2020-01-01 09:10:45 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:11:00 [debug] [gwdst:1, gwsrc:3, cnt:13815, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550112dac2034100]
+2020-01-01 09:11:00 [debug] Sent: [gwdst:3, gwsrc:1, cnt:50, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13815]
+2020-01-01 09:11:00 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:11:30 [debug] [gwdst:1, gwsrc:3, cnt:13816, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550130dac2034101]
+2020-01-01 09:11:30 [debug] Sent: [gwdst:3, gwsrc:1, cnt:51, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13816]
+2020-01-01 09:11:30 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:11:49 [debug] [gwdst:1, gwsrc:3, cnt:13817, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550143dac2034100]
+2020-01-01 09:11:49 [debug] Sent: [gwdst:3, gwsrc:1, cnt:52, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13817]
+2020-01-01 09:11:49 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:12:29 [debug] [gwdst:1, gwsrc:3, cnt:13818, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55016bdac2034101]
+2020-01-01 09:12:29 [debug] Sent: [gwdst:3, gwsrc:1, cnt:53, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13818]
+2020-01-01 09:12:29 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:12:32 [debug] [gwdst:1, gwsrc:3, cnt:13819, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55016fdac2034100]
+2020-01-01 09:12:32 [debug] Sent: [gwdst:3, gwsrc:1, cnt:54, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13819]
+2020-01-01 09:12:32 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:12:52 [debug] [gwdst:1, gwsrc:3, cnt:13820, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550183dac2034101]
+2020-01-01 09:12:52 [debug] Sent: [gwdst:3, gwsrc:1, cnt:55, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13820]
+2020-01-01 09:12:52 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:13:01 [debug] [gwdst:1, gwsrc:3, cnt:13821, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55018cdac2034100]
+2020-01-01 09:13:01 [debug] Sent: [gwdst:3, gwsrc:1, cnt:56, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13821]
+2020-01-01 09:13:01 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:13:21 [debug] [gwdst:1, gwsrc:3, cnt:13822, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501a0dac2034101]
+2020-01-01 09:13:21 [debug] Sent: [gwdst:3, gwsrc:1, cnt:57, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13822]
+2020-01-01 09:13:21 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:13:56 [debug] [gwdst:1, gwsrc:3, cnt:13823, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501c3dac2034100]
+2020-01-01 09:13:56 [debug] Sent: [gwdst:3, gwsrc:1, cnt:58, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13823]
+2020-01-01 09:13:56 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:14:16 [debug] [gwdst:1, gwsrc:3, cnt:13824, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501d7dac2034101]
+2020-01-01 09:14:16 [debug] Sent: [gwdst:3, gwsrc:1, cnt:59, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13824]
+2020-01-01 09:14:16 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:14:34 [debug] [gwdst:1, gwsrc:3, cnt:13825, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501e8dac2034100]
+2020-01-01 09:14:34 [debug] Sent: [gwdst:3, gwsrc:1, cnt:60, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13825]
+2020-01-01 09:14:34 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:15:11 [debug] [gwdst:1, gwsrc:3, cnt:13826, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55010ddbc2034101]
+2020-01-01 09:15:11 [debug] Sent: [gwdst:3, gwsrc:1, cnt:61, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13826]
+2020-01-01 09:15:11 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:16:20 [debug] [gwdst:1, gwsrc:3, cnt:13827, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550152dbc2034100]
+2020-01-01 09:16:20 [debug] Sent: [gwdst:3, gwsrc:1, cnt:62, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13827]
+2020-01-01 09:16:20 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:16:40 [debug] [gwdst:1, gwsrc:3, cnt:13828, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550166dbc2034101]
+2020-01-01 09:16:40 [debug] Sent: [gwdst:3, gwsrc:1, cnt:63, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13828]
+2020-01-01 09:16:40 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:16:58 [debug] [gwdst:1, gwsrc:3, cnt:13829, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550178dbc2034100]
+2020-01-01 09:16:58 [debug] Sent: [gwdst:3, gwsrc:1, cnt:64, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13829]
+2020-01-01 09:16:58 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:17:18 [debug] [gwdst:1, gwsrc:3, cnt:13830, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55018cdbc2034101]
+2020-01-01 09:17:18 [debug] Sent: [gwdst:3, gwsrc:1, cnt:65, src:1, rf_sig:37, rf_cfg:97, flags:1348AE, ackdst:3, ackcnt:13830]
+2020-01-01 09:17:18 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:17:33 [debug] [gwdst:1, gwsrc:3, cnt:13831, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55019bdbc2034100]
+2020-01-01 09:17:33 [debug] Sent: [gwdst:3, gwsrc:1, cnt:66, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13831]
+2020-01-01 09:17:33 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:18:05 [debug] [gwdst:1, gwsrc:3, cnt:13832, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501bcdbc2034101]
+2020-01-01 09:18:05 [debug] Sent: [gwdst:3, gwsrc:1, cnt:67, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13832]
+2020-01-01 09:18:05 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:18:59 [debug] [gwdst:1, gwsrc:3, cnt:13833, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501f1dbc2034100]
+2020-01-01 09:18:59 [debug] Sent: [gwdst:3, gwsrc:1, cnt:68, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13833]
+2020-01-01 09:18:59 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:19:19 [debug] [gwdst:1, gwsrc:3, cnt:13834, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550105dcc2034101]
+2020-01-01 09:19:19 [debug] Sent: [gwdst:3, gwsrc:1, cnt:69, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13834]
+2020-01-01 09:19:19 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:19:23 [debug] [gwdst:1, gwsrc:6, cnt:22804, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 09:19:57 [debug] [gwdst:1, gwsrc:3, cnt:13835, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55012bdcc2034100]
+2020-01-01 09:19:57 [debug] Sent: [gwdst:3, gwsrc:1, cnt:70, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13835]
+2020-01-01 09:19:57 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:20:17 [debug] [gwdst:1, gwsrc:3, cnt:13836, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55013fdcc2034101]
+2020-01-01 09:20:17 [debug] Sent: [gwdst:3, gwsrc:1, cnt:71, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13836]
+2020-01-01 09:20:17 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:29:23 [debug] [gwdst:1, gwsrc:6, cnt:22805, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 09:31:16 [debug] [gwdst:1, gwsrc:3, cnt:13837, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501d2dec2034100]
+2020-01-01 09:31:16 [debug] Sent: [gwdst:3, gwsrc:1, cnt:72, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13837]
+2020-01-01 09:31:16 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:31:36 [debug] [gwdst:1, gwsrc:3, cnt:13838, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501e6dec2034101]
+2020-01-01 09:31:36 [debug] Sent: [gwdst:3, gwsrc:1, cnt:73, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13838]
+2020-01-01 09:31:36 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:32:19 [debug] [gwdst:1, gwsrc:3, cnt:13839, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550111dfc2034100]
+2020-01-01 09:32:19 [debug] Sent: [gwdst:3, gwsrc:1, cnt:74, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13839]
+2020-01-01 09:32:19 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:32:58 [debug] [gwdst:1, gwsrc:3, cnt:13840, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550138dfc2034101]
+2020-01-01 09:32:58 [debug] Sent: [gwdst:3, gwsrc:1, cnt:75, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13840]
+2020-01-01 09:32:58 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:32:59 [debug] [gwdst:1, gwsrc:3, cnt:13841, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550139dfc2034100]
+2020-01-01 09:32:59 [debug] Sent: [gwdst:3, gwsrc:1, cnt:76, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13841]
+2020-01-01 09:32:59 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:33:19 [debug] [gwdst:1, gwsrc:3, cnt:13842, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55014ddfc2034101]
+2020-01-01 09:33:19 [debug] Sent: [gwdst:3, gwsrc:1, cnt:77, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13842]
+2020-01-01 09:33:19 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:35:14 [debug] [gwdst:1, gwsrc:3, cnt:13843, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501c1dfc2034100]
+2020-01-01 09:35:14 [debug] Sent: [gwdst:3, gwsrc:1, cnt:78, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13843]
+2020-01-01 09:35:14 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:35:34 [debug] [gwdst:1, gwsrc:3, cnt:13844, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501d5dfc2034101]
+2020-01-01 09:35:34 [debug] Sent: [gwdst:3, gwsrc:1, cnt:79, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13844]
+2020-01-01 09:35:34 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:37:00 [debug] [gwdst:1, gwsrc:3, cnt:13845, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55012ae0c2034100]
+2020-01-01 09:37:00 [debug] Sent: [gwdst:3, gwsrc:1, cnt:80, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13845]
+2020-01-01 09:37:00 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:37:20 [debug] [gwdst:1, gwsrc:3, cnt:13846, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55013ee0c2034101]
+2020-01-01 09:37:20 [debug] Sent: [gwdst:3, gwsrc:1, cnt:81, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13846]
+2020-01-01 09:37:20 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:37:50 [debug] [gwdst:1, gwsrc:3, cnt:13847, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55015de0c2034100]
+2020-01-01 09:37:50 [debug] Sent: [gwdst:3, gwsrc:1, cnt:82, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13847]
+2020-01-01 09:37:50 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:38:10 [debug] [gwdst:1, gwsrc:3, cnt:13848, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550171e0c2034101]
+2020-01-01 09:38:10 [debug] Sent: [gwdst:3, gwsrc:1, cnt:83, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13848]
+2020-01-01 09:38:10 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:38:45 [debug] [gwdst:1, gwsrc:3, cnt:13849, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550193e0c2034100]
+2020-01-01 09:38:45 [debug] Sent: [gwdst:3, gwsrc:1, cnt:84, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13849]
+2020-01-01 09:38:45 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:39:15 [debug] [gwdst:1, gwsrc:3, cnt:13850, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501b1e0c2034101]
+2020-01-01 09:39:15 [debug] Sent: [gwdst:3, gwsrc:1, cnt:85, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13850]
+2020-01-01 09:39:15 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:39:23 [debug] [gwdst:1, gwsrc:6, cnt:22806, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 09:40:44 [debug] [gwdst:1, gwsrc:3, cnt:13851, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55010ae1c2034100]
+2020-01-01 09:40:44 [debug] Sent: [gwdst:3, gwsrc:1, cnt:86, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13851]
+2020-01-01 09:40:44 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:41:04 [debug] [gwdst:1, gwsrc:3, cnt:13852, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55011ee1c2034101]
+2020-01-01 09:41:04 [debug] Sent: [gwdst:3, gwsrc:1, cnt:87, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13852]
+2020-01-01 09:41:04 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:41:16 [debug] [gwdst:1, gwsrc:6, cnt:22808, src:6, rf_sig:93, rf_cfg:241, flags:131ZW, wflags:2M, payload:8149]
+2020-01-01 09:41:17 [debug] DomusNode (Sirène) need status 
+2020-01-01 09:41:17 [debug] DomusNode(Sirène): manage 11 -> 12
+2020-01-01 09:41:17 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:88, src:1, rf_sig:93, rf_cfg:241, flags:1351ZWAE, ackdst:6, ackcnt:22808, wflags:12GM, payload:78]
+2020-01-01 09:41:17 [debug] [gwdst:1, gwsrc:6, cnt:22809, src:6, rf_sig:93, rf_cfg:241, flags:135ZWA, ackdst:1, ackcnt:88, wflags:1M, payload:8178e7aab7eced2e45633c29d03d9e78a4a049]
+2020-01-01 09:41:17 [debug] node 29 change state from DOMUS_NODE_US_NONE_OK to DOMUS_NODE_US_NONE_OK
+2020-01-01 09:41:17 [debug] DomusNode(Sirène): manage 12 -> 11
+2020-01-01 09:41:17 [debug] Sent manage: [gwdst:6, gwsrc:1, cnt:89, src:1, rf_sig:93, rf_cfg:241, flags:4A, ackdst:6, ackcnt:22809]
+2020-01-01 09:41:46 [debug] [gwdst:1, gwsrc:3, cnt:13853, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550149e1c2034100]
+2020-01-01 09:41:46 [debug] Sent: [gwdst:3, gwsrc:1, cnt:90, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13853]
+2020-01-01 09:41:46 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:42:26 [debug] [gwdst:1, gwsrc:3, cnt:13854, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550170e1c2034101]
+2020-01-01 09:42:26 [debug] Sent: [gwdst:3, gwsrc:1, cnt:91, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13854]
+2020-01-01 09:42:26 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:43:14 [debug] [gwdst:1, gwsrc:3, cnt:13855, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501a0e1c2034100]
+2020-01-01 09:43:14 [debug] Sent: [gwdst:3, gwsrc:1, cnt:92, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13855]
+2020-01-01 09:43:14 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:43:34 [debug] [gwdst:1, gwsrc:3, cnt:13856, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501b4e1c2034101]
+2020-01-01 09:43:34 [debug] Sent: [gwdst:3, gwsrc:1, cnt:93, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13856]
+2020-01-01 09:43:34 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:43:51 [debug] [gwdst:1, gwsrc:3, cnt:13857, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501c5e1c2034100]
+2020-01-01 09:43:51 [debug] Sent: [gwdst:3, gwsrc:1, cnt:94, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13857]
+2020-01-01 09:43:51 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:44:11 [debug] [gwdst:1, gwsrc:3, cnt:13858, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501d9e1c2034101]
+2020-01-01 09:44:11 [debug] Sent: [gwdst:3, gwsrc:1, cnt:95, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13858]
+2020-01-01 09:44:11 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:44:22 [debug] [gwdst:1, gwsrc:3, cnt:13859, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501e5e1c2034100]
+2020-01-01 09:44:22 [debug] Sent: [gwdst:3, gwsrc:1, cnt:96, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13859]
+2020-01-01 09:44:22 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:44:42 [debug] [gwdst:1, gwsrc:3, cnt:13860, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501f9e1c2034101]
+2020-01-01 09:44:42 [debug] Sent: [gwdst:3, gwsrc:1, cnt:97, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13860]
+2020-01-01 09:44:42 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:44:45 [debug] [gwdst:1, gwsrc:3, cnt:13861, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501fbe1c2034100]
+2020-01-01 09:44:45 [debug] Sent: [gwdst:3, gwsrc:1, cnt:98, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13861]
+2020-01-01 09:44:45 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:45:15 [debug] [gwdst:1, gwsrc:3, cnt:13862, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550119e2c2034101]
+2020-01-01 09:45:15 [debug] Sent: [gwdst:3, gwsrc:1, cnt:99, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13862]
+2020-01-01 09:45:15 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:45:22 [debug] [gwdst:1, gwsrc:3, cnt:13863, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550121e2c2034100]
+2020-01-01 09:45:22 [debug] Sent: [gwdst:3, gwsrc:1, cnt:100, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13863]
+2020-01-01 09:45:22 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:45:42 [debug] [gwdst:1, gwsrc:3, cnt:13864, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550135e2c2034101]
+2020-01-01 09:45:42 [debug] Sent: [gwdst:3, gwsrc:1, cnt:101, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13864]
+2020-01-01 09:45:42 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:45:51 [debug] [gwdst:1, gwsrc:3, cnt:13865, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55013de2c2034100]
+2020-01-01 09:45:51 [debug] Sent: [gwdst:3, gwsrc:1, cnt:102, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13865]
+2020-01-01 09:45:51 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:46:26 [debug] [gwdst:1, gwsrc:3, cnt:13866, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550160e2c2034101]
+2020-01-01 09:46:26 [debug] Sent: [gwdst:3, gwsrc:1, cnt:103, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13866]
+2020-01-01 09:46:26 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:46:31 [debug] [gwdst:1, gwsrc:3, cnt:13867, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550165e2c2034100]
+2020-01-01 09:46:31 [debug] Sent: [gwdst:3, gwsrc:1, cnt:104, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13867]
+2020-01-01 09:46:31 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:47:47 [debug] [gwdst:1, gwsrc:3, cnt:13868, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501b2e2c2034101]
+2020-01-01 09:47:47 [debug] Sent: [gwdst:3, gwsrc:1, cnt:105, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13868]
+2020-01-01 09:47:47 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:48:09 [debug] [gwdst:1, gwsrc:3, cnt:13869, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501c8e2c2034100]
+2020-01-01 09:48:09 [debug] Sent: [gwdst:3, gwsrc:1, cnt:106, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13869]
+2020-01-01 09:48:09 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:48:29 [debug] [gwdst:1, gwsrc:3, cnt:13870, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501dce2c2034101]
+2020-01-01 09:48:29 [debug] Sent: [gwdst:3, gwsrc:1, cnt:107, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13870]
+2020-01-01 09:48:29 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:49:00 [debug] [gwdst:1, gwsrc:3, cnt:13871, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501fae2c2034100]
+2020-01-01 09:49:00 [debug] Sent: [gwdst:3, gwsrc:1, cnt:108, src:1, rf_sig:18, rf_cfg:52, flags:1348AE, ackdst:3, ackcnt:13871]
+2020-01-01 09:49:00 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:49:20 [debug] [gwdst:1, gwsrc:3, cnt:13872, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55010ee3c2034101]
+2020-01-01 09:49:20 [debug] Sent: [gwdst:3, gwsrc:1, cnt:109, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13872]
+2020-01-01 09:49:20 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:49:23 [debug] [gwdst:1, gwsrc:6, cnt:22810, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 09:49:46 [debug] [gwdst:1, gwsrc:3, cnt:13873, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:550128e3c2034100]
+2020-01-01 09:49:46 [debug] Sent: [gwdst:3, gwsrc:1, cnt:110, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13873]
+2020-01-01 09:49:46 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:50:37 [debug] [gwdst:1, gwsrc:3, cnt:13874, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55015be3c2034101]
+2020-01-01 09:50:37 [debug] Sent: [gwdst:3, gwsrc:1, cnt:111, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13874]
+2020-01-01 09:50:37 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:50:39 [debug] [gwdst:1, gwsrc:3, cnt:13875, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55015de3c2034100]
+2020-01-01 09:50:39 [debug] Sent: [gwdst:3, gwsrc:1, cnt:112, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13875]
+2020-01-01 09:50:39 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:51:25 [debug] [gwdst:1, gwsrc:3, cnt:13876, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55018be3c2034101]
+2020-01-01 09:51:25 [debug] Sent: [gwdst:3, gwsrc:1, cnt:113, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13876]
+2020-01-01 09:51:25 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:51:48 [debug] [gwdst:1, gwsrc:3, cnt:13877, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501a2e3c2034100]
+2020-01-01 09:51:48 [debug] Sent: [gwdst:3, gwsrc:1, cnt:114, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13877]
+2020-01-01 09:51:48 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:52:08 [debug] [gwdst:1, gwsrc:3, cnt:13878, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501b6e3c2034101]
+2020-01-01 09:52:08 [debug] Sent: [gwdst:3, gwsrc:1, cnt:115, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13878]
+2020-01-01 09:52:08 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:52:13 [debug] [gwdst:1, gwsrc:3, cnt:13879, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501bbe3c2034100]
+2020-01-01 09:52:13 [debug] Sent: [gwdst:3, gwsrc:1, cnt:116, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13879]
+2020-01-01 09:52:13 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 09:52:33 [debug] [gwdst:1, gwsrc:3, cnt:13880, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501cfe3c2034101]
+2020-01-01 09:52:33 [debug] Sent: [gwdst:3, gwsrc:1, cnt:117, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13880]
+2020-01-01 09:52:33 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 09:59:23 [debug] [gwdst:1, gwsrc:6, cnt:22811, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 10:03:25 [debug] [gwdst:1, gwsrc:3, cnt:13881, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55015be6c2034100]
+2020-01-01 10:03:25 [debug] Sent: [gwdst:3, gwsrc:1, cnt:118, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13881]
+2020-01-01 10:03:25 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 10:03:45 [debug] [gwdst:1, gwsrc:3, cnt:13882, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55016fe6c2034101]
+2020-01-01 10:03:45 [debug] Sent: [gwdst:3, gwsrc:1, cnt:119, src:1, rf_sig:43, rf_cfg:113, flags:1348AE, ackdst:3, ackcnt:13882]
+2020-01-01 10:03:45 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 10:09:23 [debug] [gwdst:1, gwsrc:6, cnt:22812, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
+2020-01-01 10:17:19 [debug] [gwdst:1, gwsrc:3, cnt:13883, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:55019de9c2034100]
+2020-01-01 10:17:19 [debug] Sent: [gwdst:3, gwsrc:1, cnt:120, src:1, rf_sig:31, rf_cfg:93, flags:1348AE, ackdst:3, ackcnt:13883]
+2020-01-01 10:17:19 [info] Pir: 17 mvt start, room:  area: 
+2020-01-01 10:17:39 [debug] [gwdst:1, gwsrc:3, cnt:13884, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501b1e9c2034101]
+2020-01-01 10:17:39 [debug] Sent: [gwdst:3, gwsrc:1, cnt:121, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:13884]
+2020-01-01 10:17:39 [info] Pir: 17 mvt end, room:  area: 
+2020-01-01 10:19:23 [debug] [gwdst:1, gwsrc:6, cnt:22813, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
