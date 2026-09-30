@@ -44,3 +44,28 @@ func TestParse(t *testing.T) {
 		t.Errorf("bare ack: %+v", bareAck)
 	}
 }
+
+// TestParseSyslogRuns: /data/fbxhome.log has no time and spans several
+// fbxhome runs, whose counters restart: an ack never links across runs.
+func TestParseSyslogRuns(t *testing.T) {
+	log := `fbxhome[967]: start loading  /data/fbxhome.xml.7
+fbxhome[967]: [gwdst:1, gwsrc:3, cnt:10, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501000000004100]
+fbxhome[967]: Sent: [gwdst:3, gwsrc:1, cnt:5, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:10]
+void DomusNode::reset_timer()
+fbxhome[974]: start loading  /data/fbxhome.xml.1
+fbxhome[974]: Sent: [gwdst:3, gwsrc:1, cnt:0, src:1, rf_sig:0, rf_cfg:0, flags:1348AE, ackdst:3, ackcnt:10]
+`
+	frames, err := Parse(strings.NewReader(log))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(frames) != 3 {
+		t.Fatalf("got %d frames, want 3", len(frames))
+	}
+	if f := frames[0]; f.Run != 1 || !f.Time.IsZero() || f.Line != 2 {
+		t.Errorf("first frame: %+v", f)
+	}
+	if frames[1].AckOf != 0 || frames[2].Run != 2 || frames[2].AckOf != -1 {
+		t.Errorf("links: %d, run %d %d", frames[1].AckOf, frames[2].Run, frames[2].AckOf)
+	}
+}
