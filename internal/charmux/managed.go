@@ -33,8 +33,10 @@ const (
 )
 
 // Flag bits 11-13 count the route hops written right after the flags.
-// fbxhome routes every frame that acknowledges nothing (a frame it
-// initiates, e.g. a siren command) through its destination: one hop.
+// fbxhome routes a frame that acknowledges nothing (one it initiates, e.g.
+// a siren command) along its destination's parent chain (domus_gw_addr,
+// up to 7 hops, FUN_00080268). With every sensor attached to the camera
+// that is a single hop, the destination itself: the only case supported.
 // A frame whose Z, W and A bits are all clear is an MCU delivery report,
 // which always carries AckDst/AckCnt (wait_src/wait_cnt: the gateway frame
 // it reports on). Source: fbxhome deserializer FUN_0008f55c and serializer
@@ -68,13 +70,12 @@ func (f *ManagedFrame) serialize() []byte {
 	binary.LittleEndian.PutUint16(flagBytes[:], flags)
 	buf = append(buf, flagBytes[:]...)
 
+	// A routed frame never acknowledges anything (FUN_0009004c).
 	if f.Route != 0 {
 		buf = appendVarint(buf, f.Route)
 	}
 	if f.Flags&FlagA != 0 {
-		if f.Route == 0 { // a routed frame's last hop is its AckDst
-			buf = appendVarint(buf, f.AckDst)
-		}
+		buf = appendVarint(buf, f.AckDst)
 		buf = appendVarint(buf, f.AckCnt)
 	}
 

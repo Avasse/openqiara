@@ -382,22 +382,16 @@ func TestRoutedFrameMatchesSirenWorkaround(t *testing.T) {
 }
 
 // TestMCUDeliveryReport: Z, W and A clear means an MCU report, whose
-// wait_src/wait_cnt name the gateway frame it is about. Fields from a
-// fbxhome log line: [gwdst:1, gwsrc:1, cnt:8807242, src:1, flags:64,
-// reason:UNREACHABLE, waitsrc:1, waitcnt:11].
+// wait_src/wait_cnt name the gateway frame it is about. Fields of a fbxhome
+// log line ([gwdst:1, gwsrc:1, cnt:8807242, src:1, flags:64,
+// reason:UNREACHABLE, waitsrc:1, waitcnt:11]), counter shortened to 21.
 func TestMCUDeliveryReport(t *testing.T) {
-	report := ManagedFrame{GWDst: 1, GWSrc: 1, Counter: 8807242, Src: 1, Flags: 0x0040,
-		AckDst: 1, AckCnt: 11}
-	data := report.Serialize()
-	// The serializer only writes ack fields under FlagA: append them the way
-	// the MCU does for a report.
-	data = appendVarint(appendVarint(data, 1), 11)
-
-	got, err := DeserializeManagedFrame(data)
+	wire := []byte{0x01, 0x01, 0x00, 0x2a, 0x01, 0x40, 0x00, 0x01, 0x0b}
+	got, err := DeserializeManagedFrame(wire)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Flags != 0x0040 || got.AckDst != 1 || got.AckCnt != 11 || got.Counter != 8807242 {
+	if got.Counter != 21 || got.Flags != 0x0040 || got.AckDst != 1 || got.AckCnt != 11 {
 		t.Errorf("report: %+v", got)
 	}
 }
