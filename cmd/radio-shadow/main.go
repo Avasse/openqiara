@@ -9,7 +9,10 @@
 // /var/log/fbxhome.log is timestamped in the camera's time zone;
 // /data/fbxhome.log spans several fbxhome runs but has no time, so its time
 // frames are not compared. Keypad codes are compared by structure and never
-// printed. The exit status is 1 when the engine differs from fbxhome.
+// printed. With -manifest and -bytecode (the camera's update manifest and
+// bytecode files), bytecode pushes are built like in production and
+// compared byte for byte; without, the engine replays fbxhome's own.
+// The exit status is 1 when the engine differs from fbxhome.
 package main
 
 import (
@@ -21,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/caligone/openqiara/internal/domusvm"
 	"github.com/caligone/openqiara/internal/fbxreplay"
 	"github.com/caligone/openqiara/internal/radio"
 	"github.com/caligone/openqiara/internal/radio/shadow"
@@ -61,6 +65,8 @@ func main() {
 	siren := flag.Uint("siren", 0, "alarm siren address sent in sensor configs, 0 for none")
 	codes := flag.Int("codes", 1, "number of 4-digit codes on the keypad")
 	zone := flag.String("tz", "Europe/Paris", "time zone of the camera's log")
+	manifest := flag.String("manifest", "", "update_manifest.json of the camera")
+	bytecode := flag.String("bytecode", "", "directory of the camera's <hash>.bin bytecode files")
 	flag.Parse()
 
 	loc, err := time.LoadLocation(*zone)
@@ -73,6 +79,13 @@ func main() {
 		}
 	}
 	opts := radio.Options{Gateway: uint32(*gateway), AlarmSiren: uint32(*siren), Nodes: nodes}
+	if *manifest != "" {
+		m, err := domusvm.LoadManifest(*manifest)
+		if err != nil {
+			fail(err)
+		}
+		opts.Bytecode = func(fw []byte) ([][]byte, error) { return m.Frames(*bytecode, fw) }
+	}
 
 	differs := false
 	for _, path := range flag.Args() {

@@ -47,8 +47,9 @@ func (r *Report) diverge(line int, format string, args ...any) {
 }
 
 // Compare replays frames through the engine, a fresh engine per fbxhome
-// run. o describes the camera's sensors; its Bytecode is replaced by the
-// frames fbxhome pushed in the transcript.
+// run. o describes the camera's sensors. Without a Bytecode source, the
+// engine is served the frames fbxhome pushed in the transcript; with the
+// real one (domusvm), bytecode pushes are compared byte for byte.
 func Compare(frames []fbxreplay.Frame, o radio.Options) (Report, error) {
 	rep := Report{Excused: make(map[string]int)}
 	for start := 0; start < len(frames); {
@@ -74,7 +75,9 @@ func replayRun(frames []fbxreplay.Frame, start, end int, o radio.Options, rep *R
 			siren = n.Addr
 		}
 	}
-	o.Bytecode = transcriptBytecode(frames[start:end])
+	if o.Bytecode == nil {
+		o.Bytecode = transcriptBytecode(frames[start:end])
+	}
 	e, err := radio.New(o)
 	if err != nil {
 		return err
