@@ -98,11 +98,8 @@ func (c *Client) Connect(ctx context.Context) error {
 		}
 	}
 
-	// Shutter init byte 0x02 (captured from fbxhome)
-	if c.shutterConn != nil {
-		_, _ = c.shutterConn.Write([]byte{0x02})
-		c.log.Info("charmux: shutter init sent (0x02)")
-	}
+	// No shutter byte here: fbxhome sends 0x02 when it starts, but 0x02
+	// closes the shutter (SendShutter), and a restart must not.
 
 	c.log.Info("charmux: connected", "ctrl", c.ctrlConn.LocalAddr(), "pkt", c.pktConn.LocalAddr())
 
