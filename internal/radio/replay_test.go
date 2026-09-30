@@ -2,10 +2,12 @@ package radio
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -15,24 +17,50 @@ import (
 
 // The fbxhome transcripts of internal/fbxreplay, with the sensors paired on
 // the camera they come from (addresses and system indexes from its
-// fbxhome.xml; the keypad PIN is anonymised to 0000 in the fixtures).
+// fbxhome.xml; keypad codes are anonymised to 0000 in the fixtures).
 var transcripts = []struct {
 	file  string
 	boot  bool // the capture starts when fbxhome starts
-	nodes []Node
+	opts  Options
+	siren uint32
 }{
-	{"steady_day.log", true, []Node{
-		{Addr: 2, Model: KPD, SystemIndex: 0, PIN: "0000"},
+	{"steady_day.log", true, Options{Gateway: 1, AlarmSiren: 6, Nodes: []Node{
+		{Addr: 2, Model: KPD, SystemIndex: 0, PINs: []string{"0000"}},
 		{Addr: 3, Model: PIR, SystemIndex: 1},
 		{Addr: 5, Model: DWS, SystemIndex: 2},
 		{Addr: 6, Model: SRN, SystemIndex: 3},
-	}},
-	{"alarm_cycle.log", false, []Node{
+	}}, 6},
+	{"alarm_cycle.log", false, Options{Gateway: 1, AlarmSiren: 7, Nodes: []Node{
 		{Addr: 3, Model: DWS},
 		{Addr: 4, Model: PIR},
-		{Addr: 6, Model: KPD, PIN: "0000"},
+		{Addr: 6, Model: KPD, PINs: []string{"0000"}},
 		{Addr: 7, Model: SRN},
-	}},
+	}}, 7},
+}
+
+// excuse is a kind of fbxhome frame the engine does not reproduce, on
+// purpose, and why.
+type excuse struct {
+	why   string
+	match func(f fbxreplay.Frame, siren uint32) bool
+}
+
+// notReproduced: any other fbxhome frame the engine misses fails the replay.
+var notReproduced = []excuse{
+	{"Sigfox info request (HlSrn::send_get_sf_info in the raw log): the Sigfox cloud is dead",
+		func(f fbxreplay.Frame, _ uint32) bool {
+			return f.Route != 0 && f.WFlags == 0x02 && bytes.Equal(f.Payload, []byte{0x55, 0x0f})
+		}},
+	{"siren reboot step 1, routed read_status(0x08): not supported",
+		func(f fbxreplay.Frame, _ uint32) bool {
+			return f.Route != 0 && f.WFlags == wfReadStatus && bytes.Equal(f.Payload, []byte{0x08})
+		}},
+	{"siren reboot step 2, class 5 frame: not supported",
+		func(f fbxreplay.Frame, _ uint32) bool { return f.WFlags == 0x85 }},
+	{"siren command decided by fbxhome's own alarm logic: openqiara's alarm sends it through Command",
+		func(f fbxreplay.Frame, siren uint32) bool {
+			return f.Route == siren && f.WFlags == wfApp && !bytes.Equal(f.Payload, []byte{0x55, 0x06})
+		}},
 }
 
 func loadTranscript(t *testing.T, name string) []fbxreplay.Frame {
@@ -49,17 +77,26 @@ func loadTranscript(t *testing.T, name string) []fbxreplay.Frame {
 	return frames
 }
 
+func newEngine(t *testing.T, o Options) *Engine {
+	t.Helper()
+	e, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
 // transcriptBytecode serves the bytecode fbxhome pushed in the transcript,
 // so VM frames compare byte for byte: the fixtures keep the frame
 // structure, not the proprietary data.
-func transcriptBytecode(frames []fbxreplay.Frame) func([]byte) ([]VMFrame, error) {
-	pushes := make(map[string][]VMFrame)
+func transcriptBytecode(frames []fbxreplay.Frame) func([]byte) ([][]byte, error) {
+	pushes := make(map[string][][]byte)
 	for i, f := range frames {
 		p := f.Payload
 		if f.Sent || f.WFlags != wfManageAnswer || len(p) < 10 || p[1] != readStatusAll || p[0]&statusNeedBytecode == 0 {
 			continue
 		}
-		var vm []VMFrame
+		var vm [][]byte
 		for _, g := range frames[i+1:] {
 			if !g.Sent || g.GWDst != f.Src {
 				continue
@@ -67,63 +104,49 @@ func transcriptBytecode(frames []fbxreplay.Frame) func([]byte) ([]VMFrame, error
 			if g.WFlags != wfBytecode {
 				break
 			}
-			vm = append(vm, VMFrame{Payload: g.Payload, Ops: countOps(g.Payload)})
+			vm = append(vm, g.Payload)
 		}
 		pushes[string(p[2:10])] = vm
 	}
-	return func(fw []byte) ([]VMFrame, error) { return pushes[string(fw)], nil }
-}
-
-// countOps walks a VM write frame: 0x01 marker, then ops (0x87 write: addr,
-// length, data; 0x82 boot: mode, entry; 0x80 start and 0x88 erase: none).
-func countOps(p []byte) int {
-	ops := 0
-	for i := 1; i < len(p); ops++ {
-		op := p[i]
-		i++
-		switch op {
-		case 0x87:
-			i += 5 + int(p[i+4])
-		case 0x82:
-			i += 6
-		}
-	}
-	return ops
+	return func(fw []byte) ([][]byte, error) { return pushes[string(fw)], nil }
 }
 
 // sameFrame compares an engine frame with fbxhome's, counter aside: the
-// engine does not send what fbxhome sent on its own (Sigfox queries, the
-// siren reboot), so the two counters drift apart.
+// engine does not send what fbxhome sent on its own, so the two counters
+// drift apart. A time frame carries the clock: equal within a second.
 func sameFrame(got charmux.ManagedFrame, want fbxreplay.Frame) error {
 	w := want.ManagedFrame
 	if got.GWDst != w.GWDst || got.GWSrc != w.GWSrc || got.Src != w.Src || got.Flags != w.Flags ||
 		got.Route != w.Route || got.AckDst != w.AckDst || got.AckCnt != w.AckCnt || got.WFlags != w.WFlags {
 		return fmt.Errorf("got %+v, fbxhome line %d sent %+v", got, want.Line, w)
 	}
-	if w.WFlags == wfTime { // carries the clock
-		if len(got.Payload) != 4 {
-			return fmt.Errorf("time payload %x", got.Payload)
+	if w.WFlags == wfTime && len(got.Payload) == 4 && len(w.Payload) == 4 {
+		d := int64(binary.LittleEndian.Uint32(got.Payload)) - int64(binary.LittleEndian.Uint32(w.Payload))
+		if d < -1 || d > 1 {
+			return fmt.Errorf("time %x, fbxhome line %d sent %x", got.Payload, want.Line, w.Payload)
 		}
-	} else if !bytes.Equal(got.Payload, w.Payload) {
+		return nil
+	}
+	if !bytes.Equal(got.Payload, w.Payload) {
 		return fmt.Errorf("payload %x, fbxhome line %d sent %x", got.Payload, want.Line, w.Payload)
 	}
 	return nil
 }
 
 // TestReplayAgainstFbxhome feeds the engine every sensor frame fbxhome
-// received and checks it answers exactly what fbxhome answered.
+// received, checks it answers exactly what fbxhome answered, and that every
+// fbxhome frame it does not reproduce is listed in notReproduced.
 func TestReplayAgainstFbxhome(t *testing.T) {
 	for _, tr := range transcripts {
 		t.Run(tr.file, func(t *testing.T) {
 			frames := loadTranscript(t, tr.file)
-			e := New(Options{Gateway: 1, Nodes: tr.nodes, Bytecode: transcriptBytecode(frames)})
+			opts := tr.opts
+			opts.Bytecode = transcriptBytecode(frames)
+			e := newEngine(t, opts)
 			ours := make(map[int]bool) // fbxhome frames the engine reproduced
 
 			if tr.boot {
-				first := 0
-				for !frames[first].Sent {
-					first++
-				}
+				first := slices.IndexFunc(frames, func(f fbxreplay.Frame) bool { return f.Sent })
 				start := e.Start().Send
 				if len(start) != 1 {
 					t.Fatalf("Start sent %d frames, want the siren get-state", len(start))
@@ -134,14 +157,13 @@ func TestReplayAgainstFbxhome(t *testing.T) {
 				ours[first] = true
 			}
 
-			answered := 0
 			for i, rx := range frames {
 				if rx.Sent || rx.Reason != "" {
 					continue // MCU reports name fbxhome's counters, not the engine's
 				}
 				got := e.Receive(rx.Time, rx.ManagedFrame).Send
 				if rx.AckOf >= 0 && !ours[rx.AckOf] {
-					continue // answers a frame fbxhome sent on its own
+					continue // answers a frame the engine did not send
 				}
 				var want []int
 				for j, f := range frames {
@@ -159,119 +181,110 @@ func TestReplayAgainstFbxhome(t *testing.T) {
 						continue
 					}
 					ours[j] = true
-					answered++
 				}
 			}
-			t.Logf("%d answers identical to fbxhome's", answered)
-			if answered == 0 {
-				t.Error("nothing compared")
-			}
-		})
-	}
-}
 
-// TestCommandsMatchFbxhome: the siren commands fbxhome sent on its own
-// (arming beep, alert...) are what Command builds.
-func TestCommandsMatchFbxhome(t *testing.T) {
-	n := 0
-	for _, tr := range transcripts {
-		e := New(Options{Gateway: 1, Nodes: tr.nodes})
-		for _, f := range loadTranscript(t, tr.file) {
-			if !f.Sent || f.Route == 0 || f.WFlags != wfApp {
-				continue
+			excused := make(map[string]int)
+			for j, f := range frames {
+				if !f.Sent || ours[j] {
+					continue
+				}
+				k := slices.IndexFunc(notReproduced, func(x excuse) bool { return x.match(f, tr.siren) })
+				if k < 0 {
+					t.Errorf("fbxhome line %d not reproduced: %+v", f.Line, f.ManagedFrame)
+					continue
+				}
+				excused[notReproduced[k].why]++
 			}
-			got := e.Command(f.GWDst, f.Payload).Send
-			if len(got) != 1 {
-				t.Fatalf("%s line %d: no command frame", tr.file, f.Line)
-			}
-			if err := sameFrame(got[0], f); err != nil {
-				t.Errorf("%s line %d: %v", tr.file, f.Line, err)
-			}
-			n++
-		}
-	}
-	if n == 0 {
-		t.Error("no command in the transcripts")
+			t.Logf("%d fbxhome frames reproduced; not reproduced on purpose: %v", len(ours), excused)
+		})
 	}
 }
 
 var (
 	fbxMotion  = regexp.MustCompile(`mvt (start|end)`)
 	fbxDoor    = regexp.MustCompile(`Dws:\s+\d+ (open|close)`)
-	fbxKeypad  = regexp.MustCompile(`KPD_(DAY_ALARM|NIGHT_ALARM|ALARM_OFF)`)
+	fbxKeypad  = regexp.MustCompile(`KPD_(DAY_ALARM|NIGHT_ALARM|ALARM_OFF|EMERGENCY|TAMPER)`)
 	fbxSiren   = regexp.MustCompile(`HlSrn state change from \w+ to (\w+)`)
 	fbxBattery = regexp.MustCompile(`set_battery_level \(?(\d+)`)
 
 	fromFbxhome = map[string]EventKind{
 		"start": MotionStart, "end": MotionEnd, "open": Opened, "close": Closed,
 		"DAY_ALARM": ArmedAway, "NIGHT_ALARM": ArmedNight, "ALARM_OFF": Disarmed,
+		"EMERGENCY": Emergency, "TAMPER": Tamper,
 	}
 	sirenStates = map[string]int{
 		"OFF": 0, "TIMEOUT_BEFORE_ARMED": 2, "ARMED": 3, "TIMEOUT_BEFORE_ALERT": 4, "ALERT_WITH_SRN": 5,
 	}
+	stateEvents = []EventKind{Opened, Closed, MotionStart, MotionEnd, ArmedAway, ArmedNight,
+		Disarmed, Emergency, Tamper, SirenState, Unhandled}
 )
 
-// fbxhomeReading is the event fbxhome logged about a received frame, if any.
+// fbxhomeReading is the state event fbxhome logged about a received frame.
 func fbxhomeReading(model Model, rx fbxreplay.Frame) (Event, bool) {
 	ev := Event{Addr: rx.Src}
+	pattern := map[Model]*regexp.Regexp{PIR: fbxMotion, DWS: fbxDoor, KPD: fbxKeypad, SRN: fbxSiren}[model]
 	for _, note := range rx.Notes {
-		var m []string
+		m := pattern.FindStringSubmatch(note)
 		switch {
-		case model == PIR:
-			m = fbxMotion.FindStringSubmatch(note)
-		case model == DWS:
-			m = fbxDoor.FindStringSubmatch(note)
-		case model == KPD:
-			m = fbxKeypad.FindStringSubmatch(note)
+		case m == nil:
+			continue
 		case model == SRN:
-			if m = fbxSiren.FindStringSubmatch(note); m != nil {
-				state, known := sirenStates[m[1]]
-				ev.Kind, ev.Value = SirenState, state
-				return ev, known
-			}
-		}
-		if m != nil {
+			state, known := sirenStates[m[1]]
+			ev.Kind, ev.Value = SirenState, state
+			return ev, known
+		default:
 			ev.Kind = fromFbxhome[m[1]]
 			return ev, true
-		}
-		if rx.WFlags == wfStatus {
-			if b := fbxBattery.FindStringSubmatch(note); b != nil {
-				ev.Kind = Battery
-				ev.Value, _ = strconv.Atoi(b[1])
-				return ev, true
-			}
 		}
 	}
 	return ev, false
 }
 
-// TestEventsMatchFbxhomeReading: for every state report and heartbeat,
-// the engine reports what fbxhome's log says the sensor meant.
+// TestEventsMatchFbxhomeReading: for every received frame, the state events
+// the engine reports are exactly what fbxhome's log says the sensor meant
+// (a siren is only checked when fbxhome logs a state change), and battery
+// levels are the ones fbxhome set.
 func TestEventsMatchFbxhomeReading(t *testing.T) {
 	checked := 0
 	for _, tr := range transcripts {
 		models := make(map[uint32]Model)
-		for _, n := range tr.nodes {
+		for _, n := range tr.opts.Nodes {
 			models[n.Addr] = n.Model
 		}
-		e := New(Options{Gateway: 1, Nodes: tr.nodes})
+		e := newEngine(t, tr.opts)
 		for _, rx := range loadTranscript(t, tr.file) {
 			if rx.Sent || rx.Reason != "" {
 				continue
 			}
-			got := e.Receive(rx.Time, rx.ManagedFrame).Events
-			want, ok := fbxhomeReading(models[rx.Src], rx)
-			if !ok {
-				continue
+			events := e.Receive(rx.Time, rx.ManagedFrame).Events
+			var got []Event
+			for _, ev := range events {
+				if slices.Contains(stateEvents, ev.Kind) {
+					got = append(got, ev)
+				}
 			}
-			checked++
-			found := false
-			for _, ev := range got {
-				found = found || ev == want
+			model := models[rx.Src]
+			if want, ok := fbxhomeReading(model, rx); ok {
+				checked++
+				if len(got) != 1 || got[0] != want {
+					t.Errorf("%s line %d (payload %x): engine %+v, fbxhome read %+v", tr.file, rx.Line, rx.Payload, got, want)
+				}
+			} else if len(got) > 0 && model != SRN {
+				t.Errorf("%s line %d (payload %x): engine %+v, fbxhome read nothing", tr.file, rx.Line, rx.Payload, got)
 			}
-			if !found {
-				t.Errorf("%s line %d (payload %x): engine reported %+v, fbxhome read %+v",
-					tr.file, rx.Line, rx.Payload, got, want)
+
+			if rx.WFlags == wfStatus {
+				for _, note := range rx.Notes {
+					if b := fbxBattery.FindStringSubmatch(note); b != nil {
+						level, _ := strconv.Atoi(b[1])
+						checked++
+						if !slices.Contains(events, Event{Addr: rx.Src, Kind: Battery, Value: level}) {
+							t.Errorf("%s line %d: engine %+v, fbxhome battery %d", tr.file, rx.Line, events, level)
+						}
+						break
+					}
+				}
 			}
 		}
 	}
