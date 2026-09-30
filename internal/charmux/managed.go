@@ -14,6 +14,7 @@ type ManagedFrame struct {
 	Counter uint32 // Frame counter
 	Src     uint32 // Source ID
 	Flags   uint16 // Frame flags (see FlagXxx constants)
+	Route   uint32 // Hop of a routed frame (flag bits 11-13), 0 if none
 	AckDst  uint32 // ACK destination / wait_src
 	AckCnt  uint32 // ACK counter / wait_cnt
 	WFlags  byte   // Wake flags (only if FlagW set)
@@ -31,6 +32,18 @@ const (
 	FlagE uint16 = 1 << 10 //
 )
 
+// Flag bits 11-13 count the route hops written right after the flags.
+// fbxhome routes every frame that acknowledges nothing (a frame it
+// initiates, e.g. a siren command) through its destination: one hop.
+// A frame whose Z, W and A bits are all clear is an MCU delivery report,
+// which always carries AckDst/AckCnt (wait_src/wait_cnt: the gateway frame
+// it reports on). Source: fbxhome deserializer FUN_0008f55c and serializer
+// FUN_0009004c.
+const (
+	routeShift = 11
+	routeMask  = 7 << routeShift
+)
+
 // Serialize encodes the managed frame into its binary wire format.
 func (f *ManagedFrame) Serialize() []byte {
 	return f.serialize()
@@ -45,13 +58,23 @@ func (f *ManagedFrame) serialize() []byte {
 	buf = appendVarint(buf, f.Counter*2) // counter is LSL 1
 	buf = appendVarint(buf, f.Src)
 
-	// flags: uint16 little-endian (NOT varint)
+	// flags: uint16 little-endian (NOT varint). A Route sets the hop count;
+	// without one the flags go out untouched.
+	flags := f.Flags
+	if f.Route != 0 {
+		flags = flags&^routeMask | 1<<routeShift
+	}
 	var flagBytes [2]byte
-	binary.LittleEndian.PutUint16(flagBytes[:], f.Flags)
+	binary.LittleEndian.PutUint16(flagBytes[:], flags)
 	buf = append(buf, flagBytes[:]...)
 
+	if f.Route != 0 {
+		buf = appendVarint(buf, f.Route)
+	}
 	if f.Flags&FlagA != 0 {
-		buf = appendVarint(buf, f.AckDst)
+		if f.Route == 0 { // a routed frame's last hop is its AckDst
+			buf = appendVarint(buf, f.AckDst)
+		}
 		buf = appendVarint(buf, f.AckCnt)
 	}
 
@@ -98,13 +121,29 @@ func DeserializeManagedFrame(data []byte) (*ManagedFrame, error) {
 	f.Flags = binary.LittleEndian.Uint16(data[pos : pos+2])
 	pos += 2
 
-	// AckDst/AckCnt are only present when the A flag is set.
-	if f.Flags&FlagA != 0 {
+	if f.Flags&(FlagZ|FlagW|FlagA) == 0 {
+		// MCU delivery report: wait_src and wait_cnt.
 		f.AckDst, n = decodeVarint(data[pos:])
 		pos += n
-
 		f.AckCnt, n = decodeVarint(data[pos:])
 		pos += n
+	} else {
+		// Route hops, then AckDst/AckCnt when the A flag is set. A routed
+		// frame keeps its last hop, which doubles as its AckDst.
+		for hops := int(f.Flags&routeMask) >> routeShift; hops > 0; hops-- {
+			f.Route, n = decodeVarint(data[pos:])
+			pos += n
+		}
+		if f.Flags&FlagA != 0 {
+			if f.Route != 0 {
+				f.AckDst = f.Route
+			} else {
+				f.AckDst, n = decodeVarint(data[pos:])
+				pos += n
+			}
+			f.AckCnt, n = decodeVarint(data[pos:])
+			pos += n
+		}
 	}
 
 	if f.Flags&FlagW != 0 && pos < len(data) {

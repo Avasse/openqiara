@@ -356,3 +356,48 @@ func TestChunking(t *testing.T) {
 		t.Errorf("last chunk too big: %d", lastChunkSize)
 	}
 }
+
+// TestRoutedFrameMatchesSirenWorkaround: a siren command built with Route
+// serializes to the exact bytes of the older workaround that put the
+// address in WFlags and the real wflags in the first payload byte, which
+// was validated audibly on hardware.
+func TestRoutedFrameMatchesSirenWorkaround(t *testing.T) {
+	routed := ManagedFrame{GWDst: 7, GWSrc: 1, Counter: 3, Src: 1, Flags: 0x0543, Route: 7,
+		WFlags: 0x01, Payload: []byte{0x55, 0x05, 0x00, 0x84}}
+	workaround := ManagedFrame{GWDst: 7, GWSrc: 1, Counter: 3, Src: 1, Flags: 0x0D43,
+		WFlags: 7, Payload: []byte{0x01, 0x55, 0x05, 0x00, 0x84}}
+	got := routed.Serialize()
+	if want := workaround.Serialize(); !bytes.Equal(got, want) {
+		t.Fatalf("routed %x, workaround %x", got, want)
+	}
+
+	back, err := DeserializeManagedFrame(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.Flags != 0x0D43 || back.Route != 7 || back.WFlags != 0x01 ||
+		!bytes.Equal(back.Payload, routed.Payload) {
+		t.Errorf("round trip: %+v", back)
+	}
+}
+
+// TestMCUDeliveryReport: Z, W and A clear means an MCU report, whose
+// wait_src/wait_cnt name the gateway frame it is about. Fields from a
+// fbxhome log line: [gwdst:1, gwsrc:1, cnt:8807242, src:1, flags:64,
+// reason:UNREACHABLE, waitsrc:1, waitcnt:11].
+func TestMCUDeliveryReport(t *testing.T) {
+	report := ManagedFrame{GWDst: 1, GWSrc: 1, Counter: 8807242, Src: 1, Flags: 0x0040,
+		AckDst: 1, AckCnt: 11}
+	data := report.Serialize()
+	// The serializer only writes ack fields under FlagA: append them the way
+	// the MCU does for a report.
+	data = appendVarint(appendVarint(data, 1), 11)
+
+	got, err := DeserializeManagedFrame(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Flags != 0x0040 || got.AckDst != 1 || got.AckCnt != 11 || got.Counter != 8807242 {
+		t.Errorf("report: %+v", got)
+	}
+}
