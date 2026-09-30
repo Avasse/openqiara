@@ -15,14 +15,17 @@
 2020-01-02 00:03:15 [debug] Sent: [gwdst:7, gwsrc:1, cnt:5, src:1, rf_sig:75, rf_cfg:194, flags:1348AE, ackdst:7, ackcnt:5396]
 2020-01-02 00:03:33 [debug] [gwdst:1, gwsrc:3, cnt:110, src:3, rf_sig:56, rf_cfg:144, flags:131ZW, wflags:1, payload:55013fabc3034000]
 2020-01-02 00:03:33 [debug] Sent: [gwdst:3, gwsrc:1, cnt:6, src:1, rf_sig:75, rf_cfg:195, flags:132A, ackdst:3, ackcnt:110]
+2020-01-02 00:03:33 [info] Dws:  14 open, room:  area: 
 2020-01-02 00:03:33 [debug] Sent: [gwdst:7, gwsrc:1, cnt:7, src:1, rf_sig:12, rf_cfg:32, flags:3395ZWE, rt:7, wflags:1, payload:55050480]
 2020-01-02 00:03:33 [debug] HlSrn state change from ARMED to TIMEOUT_BEFORE_ALERT_SENT
 2020-01-02 00:03:33 [debug] [gwdst:1, gwsrc:7, cnt:5397, src:7, rf_sig:75, rf_cfg:195, flags:134WA, ackdst:1, ackcnt:7, wflags:1, payload:550145abc3030004]
 2020-01-02 00:03:33 [debug] HlSrn state change from TIMEOUT_BEFORE_ALERT_SENT to TIMEOUT_BEFORE_ALERT
 2020-01-02 00:03:34 [debug] [gwdst:1, gwsrc:3, cnt:111, src:3, rf_sig:50, rf_cfg:128, flags:131ZW, wflags:1, payload:550140abc3030001]
 2020-01-02 00:03:34 [debug] Sent: [gwdst:3, gwsrc:1, cnt:8, src:1, rf_sig:43, rf_cfg:114, flags:132A, ackdst:3, ackcnt:111]
+2020-01-02 00:03:34 [info] Dws: 14 close, room:  area: 
 2020-01-02 00:03:35 [debug] [gwdst:1, gwsrc:3, cnt:112, src:3, rf_sig:50, rf_cfg:128, flags:131ZW, wflags:1, payload:550141abc3030001]
 2020-01-02 00:03:35 [debug] Sent: [gwdst:3, gwsrc:1, cnt:9, src:1, rf_sig:75, rf_cfg:195, flags:132A, ackdst:3, ackcnt:112]
+2020-01-02 00:03:35 [info] Dws: 14 close, room:  area: 
 2020-01-02 00:03:43 [debug] [gwdst:1, gwsrc:7, cnt:5398, src:7, rf_sig:75, rf_cfg:195, flags:131ZW, wflags:1, payload:55014fabc3030005]
 2020-01-02 00:03:43 [debug] HlSrn state change from TIMEOUT_BEFORE_ALERT to ALERT_WITH_SRN
 2020-01-02 00:03:43 [debug] Sent: [gwdst:7, gwsrc:1, cnt:10, src:1, rf_sig:75, rf_cfg:195, flags:1348AE, ackdst:7, ackcnt:5398]

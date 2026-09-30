@@ -145,12 +145,16 @@
 2020-01-01 08:29:23 [debug] [gwdst:1, gwsrc:6, cnt:22799, src:6, rf_sig:93, rf_cfg:241, flags:134WA, ackdst:1, ackcnt:25, wflags:2, payload:550d01]
 2020-01-01 08:35:07 [debug] [gwdst:1, gwsrc:5, cnt:1240, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:55019cd1c2034200]
 2020-01-01 08:35:07 [debug] Sent: [gwdst:5, gwsrc:1, cnt:26, src:1, rf_sig:37, rf_cfg:96, flags:132A, ackdst:5, ackcnt:1240]
+2020-01-01 08:35:07 [info] Dws:  23 open, room:  area: 
 2020-01-01 08:35:07 [debug] [gwdst:1, gwsrc:5, cnt:1241, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:55019dd1c2030201]
 2020-01-01 08:35:07 [debug] Sent: [gwdst:5, gwsrc:1, cnt:27, src:1, rf_sig:93, rf_cfg:244, flags:132A, ackdst:5, ackcnt:1241]
+2020-01-01 08:35:07 [info] Dws: 23 close, room:  area: 
 2020-01-01 08:35:08 [debug] [gwdst:1, gwsrc:5, cnt:1242, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:55019ed1c2034200]
 2020-01-01 08:35:08 [debug] Sent: [gwdst:5, gwsrc:1, cnt:28, src:1, rf_sig:12, rf_cfg:47, flags:132A, ackdst:5, ackcnt:1242]
+2020-01-01 08:35:08 [info] Dws:  23 open, room:  area: 
 2020-01-01 08:35:29 [debug] [gwdst:1, gwsrc:5, cnt:1243, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:5501b3d1c2030201]
 2020-01-01 08:35:29 [debug] Sent: [gwdst:5, gwsrc:1, cnt:29, src:1, rf_sig:43, rf_cfg:113, flags:132A, ackdst:5, ackcnt:1243]
+2020-01-01 08:35:29 [info] Dws: 23 close, room:  area: 
 2020-01-01 08:39:23 [debug] [gwdst:1, gwsrc:6, cnt:22800, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
 2020-01-01 08:44:50 [debug] [gwdst:1, gwsrc:3, cnt:13797, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501f0d3c2034100]
 2020-01-01 08:44:50 [debug] Sent: [gwdst:3, gwsrc:1, cnt:30, src:1, rf_sig:93, rf_cfg:240, flags:1348AE, ackdst:3, ackcnt:13797]
@@ -161,8 +165,10 @@
 2020-01-01 08:49:23 [debug] [gwdst:1, gwsrc:6, cnt:22801, src:6, rf_sig:93, rf_cfg:241, flags:130W, wflags:1, payload:550e]
 2020-01-01 08:52:46 [debug] [gwdst:1, gwsrc:5, cnt:1244, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:5501c0d5c2034200]
 2020-01-01 08:52:46 [debug] Sent: [gwdst:5, gwsrc:1, cnt:32, src:1, rf_sig:31, rf_cfg:93, flags:132A, ackdst:5, ackcnt:1244]
+2020-01-01 08:52:46 [info] Dws:  23 open, room:  area: 
 2020-01-01 08:52:52 [debug] [gwdst:1, gwsrc:5, cnt:1245, src:5, rf_sig:37, rf_cfg:96, flags:131ZW, wflags:1, payload:5501c5d5c2030201]
 2020-01-01 08:52:52 [debug] Sent: [gwdst:5, gwsrc:1, cnt:33, src:1, rf_sig:37, rf_cfg:96, flags:132A, ackdst:5, ackcnt:1245]
+2020-01-01 08:52:52 [info] Dws: 23 close, room:  area: 
 2020-01-01 08:53:37 [debug] [gwdst:1, gwsrc:3, cnt:13799, src:3, rf_sig:93, rf_cfg:240, flags:131ZW, wflags:1, payload:5501ffd5c2034100]
 2020-01-01 08:53:37 [debug] Sent: [gwdst:3, gwsrc:1, cnt:34, src:1, rf_sig:37, rf_cfg:96, flags:1348AE, ackdst:3, ackcnt:13799]
 2020-01-01 08:53:37 [info] Pir: 17 mvt start, room:  area: 

@@ -29,18 +29,17 @@ import (
 
 // Frame is one managed frame as fbxhome logged it.
 type Frame struct {
+	charmux.ManagedFrame // AckDst/AckCnt hold waitsrc/waitcnt in MCU reports
+
 	Line   int       // 1-based line number in the log
 	Time   time.Time // log timestamp, read as UTC
 	Sent   bool      // emitted by fbxhome, i.e. by the gateway
 	Manage bool      // "Sent manage:", built by fbxhome's per-node manage path
+	Reason string    // MCU delivery report, e.g. "UNREACHABLE"
 
-	GWDst, GWSrc, Cnt, Src uint32
-	Flags                  uint16
-	Route                  uint32 // rt: hop of a gateway-initiated frame, 0 if none
-	AckDst, AckCnt         uint32 // waitsrc and waitcnt in MCU reports
-	WFlags                 byte
-	Payload                []byte
-	Reason                 string // MCU delivery report, e.g. "UNREACHABLE"
+	// Notes are fbxhome's own log lines after a received frame, up to the
+	// next received frame: its reading of that frame ("Pir: 17 mvt start").
+	Notes []string
 
 	// AckOf is the index of the frame this one acknowledges, or -1 when it
 	// acknowledges nothing or a frame older than the log.
@@ -48,33 +47,47 @@ type Frame struct {
 }
 
 var (
-	frameLine = regexp.MustCompile(`^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) \[\w+\] (Sent manage: |Sent: )?\[(gwdst:[^\]]*)\]`)
+	logLine   = regexp.MustCompile(`^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) \[\w+\] (.*)$`)
+	frameText = regexp.MustCompile(`^(Sent manage: |Sent: )?\[(gwdst:[^\]]*)\]`)
 	field     = regexp.MustCompile(`(\w+):([^,]*)`)
 	numPrefix = regexp.MustCompile(`^\d+`)
 )
 
 // Parse returns the frames of a fbxhome debug log, in log order, with AckOf
-// resolved. Lines that are not frames are skipped.
+// resolved. Other log lines end up in the Notes of the last received frame.
 func Parse(r io.Reader) ([]Frame, error) {
 	var frames []Frame
+	lastRX := -1
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	for n := 1; sc.Scan(); n++ {
-		m := frameLine.FindStringSubmatch(sc.Text())
-		if m == nil {
+		line := logLine.FindStringSubmatch(sc.Text())
+		if line == nil {
 			continue
 		}
-		f, err := parseFields(m[3])
+		stamp, text := line[1], line[2]
+		m := frameText.FindStringSubmatch(text)
+		if m == nil {
+			if lastRX >= 0 {
+				frames[lastRX].Notes = append(frames[lastRX].Notes, text)
+			}
+			continue
+		}
+		prefix, fields := m[1], m[2]
+		f, err := parseFields(fields)
 		if err != nil {
 			return nil, fmt.Errorf("fbxreplay: line %d: %w", n, err)
 		}
 		f.Line = n
-		f.Time, err = time.Parse(time.DateTime, m[1])
+		f.Time, err = time.Parse(time.DateTime, stamp)
 		if err != nil {
 			return nil, fmt.Errorf("fbxreplay: line %d: %w", n, err)
 		}
-		f.Sent = m[2] != ""
-		f.Manage = m[2] == "Sent manage: "
+		f.Sent = prefix != ""
+		f.Manage = prefix == "Sent manage: "
+		if !f.Sent {
+			lastRX = len(frames)
+		}
 		frames = append(frames, f)
 	}
 	if err := sc.Err(); err != nil {
@@ -95,7 +108,7 @@ func parseFields(s string) (Frame, error) {
 		case "gwsrc":
 			f.GWSrc, err = parseUint32(val)
 		case "cnt":
-			f.Cnt, err = parseUint32(val)
+			f.Counter, err = parseUint32(val)
 		case "src":
 			f.Src, err = parseUint32(val)
 		case "rt":
@@ -167,7 +180,7 @@ func link(frames []Frame) {
 		}
 		for j := i - 1; j >= 0; j-- {
 			g := frames[j]
-			if g.Sent != f.Sent && g.Src == f.AckDst && g.Cnt == f.AckCnt {
+			if g.Sent != f.Sent && g.Src == f.AckDst && g.Counter == f.AckCnt {
 				f.AckOf = j
 				break
 			}

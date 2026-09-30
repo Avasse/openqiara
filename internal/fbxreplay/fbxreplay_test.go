@@ -28,9 +28,12 @@ func TestParse(t *testing.T) {
 	}
 
 	status, readStatus, routed, report, bareAck := frames[0], frames[1], frames[2], frames[3], frames[4]
-	if status.Sent || status.GWSrc != 3 || status.Cnt != 13794 || status.Flags != 0x83 ||
+	if status.Sent || status.GWSrc != 3 || status.Counter != 13794 || status.Flags != 0x83 ||
 		status.WFlags != 0x82 || !bytes.Equal(status.Payload, []byte{0x81, 0xff}) || status.AckOf != -1 {
 		t.Errorf("status heartbeat: %+v", status)
+	}
+	if len(status.Notes) != 1 || status.Notes[0] != "DomusNode (Capteur de mouvement) need status" {
+		t.Errorf("status heartbeat notes: %q", status.Notes)
 	}
 	if !readStatus.Sent || !readStatus.Manage || readStatus.Flags != 0x0547 || readStatus.WFlags != 0xcc ||
 		readStatus.AckOf != 0 || readStatus.Line != 3 {
@@ -210,10 +213,10 @@ func TestGatewayCounterIsGlobal(t *testing.T) {
 			if !f.Sent {
 				continue
 			}
-			if prev >= 0 && int(f.Cnt) != prev+1 {
-				t.Errorf("%s line %d: counter %d after %d", fx.file, f.Line, f.Cnt, prev)
+			if prev >= 0 && int(f.Counter) != prev+1 {
+				t.Errorf("%s line %d: counter %d after %d", fx.file, f.Line, f.Counter, prev)
 			}
-			prev = int(f.Cnt)
+			prev = int(f.Counter)
 		}
 	}
 }
