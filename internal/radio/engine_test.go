@@ -47,6 +47,15 @@ func report(counter uint32) charmux.ManagedFrame {
 	return charmux.ManagedFrame{GWDst: 1, GWSrc: 1, Src: 1, Flags: 0x0040, AckDst: 1, AckCnt: counter}
 }
 
+func newEngine(t *testing.T, o Options) *Engine {
+	t.Helper()
+	e, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
 // oneSend returns the single frame of r, failing otherwise.
 func oneSend(t *testing.T, r Result) charmux.ManagedFrame {
 	t.Helper()
