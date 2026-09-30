@@ -1,0 +1,16 @@
+{
+  "supported": [
+    {
+      "hash_image": "e7aab7eced2e4563",
+      "model": "HOMELABSRN00BCFD",
+      "bytecode_hash": "a0a4789e3dd0293c",
+      "vm_size": 2048
+    },
+    {
+      "hash_image": "48654bf742f5070e",
+      "model": "HOMELABDWS00ACFD",
+      "bytecode_hash": "932f56223f735a6b",
+      "vm_size": 1024
+    }
+  ]
+}
