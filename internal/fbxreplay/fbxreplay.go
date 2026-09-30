@@ -12,7 +12,7 @@
 //
 // To replay a radio engine, feed it the received frames in log order and
 // compare what it sends back with the sent frames whose AckOf points to
-// them; the reaction table in the tests spells out what to expect.
+// them (internal/radio/replay_test.go).
 package fbxreplay
 
 import (
@@ -34,7 +34,6 @@ type Frame struct {
 	Line   int       // 1-based line number in the log
 	Time   time.Time // log timestamp, read as UTC
 	Sent   bool      // emitted by fbxhome, i.e. by the gateway
-	Manage bool      // "Sent manage:", built by fbxhome's per-node manage path
 	Reason string    // MCU delivery report, e.g. "UNREACHABLE"
 
 	// Notes are fbxhome's own log lines after a received frame, up to the
@@ -84,7 +83,6 @@ func Parse(r io.Reader) ([]Frame, error) {
 			return nil, fmt.Errorf("fbxreplay: line %d: %w", n, err)
 		}
 		f.Sent = prefix != ""
-		f.Manage = prefix == "Sent manage: "
 		if !f.Sent {
 			lastRX = len(frames)
 		}

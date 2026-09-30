@@ -17,15 +17,20 @@ Radio addresses — `steady_day.log`: KPD 2, PIR 3, DWS 5, SRN 6.
 Applied before commit, nothing else was changed:
 
 - only frame lines and a few context lines (`need …`, `manage a -> b`,
-  `send config to node`, `mvt start/end`, siren state changes) are kept;
-- the KPD PIN in the kpd-post frame is replaced by 0000 (`030004aaaa`);
+  `send config to node`, `mvt start/end`, `Dws: …`, siren state changes)
+  are kept;
+- keypad codes are replaced by 0000 (BCD `aaaa`): every code list sent to
+  the keypad (`Sent`, `wflags:1`, payload not starting with `55`) and every
+  code typed on it (received `55 01 <ts> <kind with bit 7> …`);
 - the data of every OpWrite in VM write frames (`wflags:13GM`) is zeroed:
   the sensor bytecode is proprietary, only opcodes, addresses and lengths
   remain;
-- every timestamp — log lines, `55 01 <ts>` events and time frames
-  (`wflags:8GM`) — is shifted by the same amount so that each file starts on
-  a fake date; relative timing is preserved.
+- class 5 payloads (`wflags:5M`, meaning unknown) are zeroed;
+- timestamps are in UTC and shifted by the same amount so that each file
+  starts on a fake date: log lines (camera local time, Europe/Paris, in the
+  raw log), `55 01 <ts>` events and time frames (`wflags:8GM`). Relative
+  timing is preserved; a time frame's payload matches its log line.
 
-Before adding a transcript, check that `grep 'wflags:1, payload:0300'` (the
-kpd-post frames fbxhome sends) only shows `030004aaaa`, and that no VM write
-payload carries non-zero data.
+Before adding a transcript, check that no `Sent` frame with `wflags:1`
+carries a payload other than `55…` or a code list of `aa` bytes, and that
+no VM write or class 5 payload carries non-zero data.
