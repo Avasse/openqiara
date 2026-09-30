@@ -1570,9 +1570,7 @@ func (s *Server) handleSetKPDCode(w http.ResponseWriter, r *http.Request) {
 
 	// Radio backend: the code goes out at the keypad's next wake.
 	if rc, ok := s.cam.(*camera.RadioClient); ok {
-		if err := rc.Reload(); err != nil {
-			s.log.Warn("radio reload failed", "error", err)
-		}
+		rc.Reload()
 	}
 	// In fbxhome mode : push le code via endpoints_write pwd. Si le KPD vient
 	// d'être pairé (< 30s), on diffère l'écriture : fbxhome est encore en
@@ -1663,9 +1661,7 @@ func (s *Server) handleDeleteKPDCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rc, ok := s.cam.(*camera.RadioClient); ok {
-		if err := rc.Reload(); err != nil {
-			s.log.Warn("radio reload failed", "error", err)
-		}
+		rc.Reload()
 	}
 	if fc, ok := s.cam.(*camera.FbxhomeClient); ok {
 		if err := fc.ClearKPDPassword(r.Context(), kpd.ID); err != nil {

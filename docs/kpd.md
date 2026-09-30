@@ -1,5 +1,13 @@
 # KPD (Keypad) Protocol
 
+> ⚠️ **Historique (2026-04/05).** Ce document décrit l'ancien client charmux,
+> supprimé le 2026-09-30. Les trames « FNV » de 33 octets sont la réponse du
+> clavier à un `read_status(0x78)` de la passerelle, pas un mode de panne :
+> le moteur `internal/radio` y répond comme fbxhome (rejoué à l'identique sur
+> ses logs de production). Ne pas suivre les consignes « ne pas répondre »
+> ci-dessous. Format actuel des codes et des événements : commentaires de
+> `internal/radio/sensors.go`.
+
 This document describes the complete DomusRF protocol for the Qiara KPD (HOMELABKPD),
 as reverse-engineered from fbxhome and validated in openqiara.
 

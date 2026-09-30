@@ -82,8 +82,9 @@ acceptée. Trois cas où l'écart est visible :
   s'abonner au flux SSE.
 - `PUT /kpd/code` persiste le code immédiatement mais **diffère l'écriture
   radio jusqu'à 30 s** si le clavier vient d'être appairé (le cycle bytecode
-  post-pairing ne doit pas être interrompu). Le `200` ne dit rien du
-  clavier, seulement de la config.
+  post-pairing ne doit pas être interrompu). En mode `charmux`, le code
+  part au prochain réveil du clavier. Le `200` ne dit rien du clavier,
+  seulement de la config.
 
 Ne « corrigez » pas les commandes en ressources REST : elles ne modélisent
 pas un état, elles déclenchent un effet.
@@ -129,7 +130,13 @@ réponse. Le `200` couvre la persistance en config, pas le push firmware.
 
 `type` ∈ `DWS`, `PIR`, `SRN`, `KPD`. `fingerprint` = 16 caractères hex du QR
 code ; les tirets, espaces et majuscules sont normalisés, une chaîne de
-32 caractères est tronquée aux 16 premiers.
+32 caractères est tronquée aux 16 premiers. En mode `charmux`, le
+fingerprint est ignoré : le premier capteur du `type` demandé qui se met en
+mode appairage est retenu.
+
+En mode `charmux`, `DELETE /sensors/{id}` arrête de servir le capteur mais
+ne le retire pas du MCU, qui n'a aucun moyen d'oublier un capteur : le
+réinitialiser pour qu'il se taise.
 
 Boucler sur `GET` jusqu'à `done:true`, puis `DELETE` pour libérer la session
 si l'utilisateur abandonne.

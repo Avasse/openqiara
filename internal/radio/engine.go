@@ -159,8 +159,12 @@ func (e *Engine) RemoveNode(addr uint32) {
 }
 
 // SetAlarmSiren changes the siren address in the sensors' config; each
-// sensor gets its config again at its next status heartbeat.
+// sensor gets its config again at its next status heartbeat. The same
+// address again changes nothing.
 func (e *Engine) SetAlarmSiren(addr uint32) {
+	if addr == e.alarmSiren {
+		return
+	}
 	e.alarmSiren = addr
 	for _, n := range e.nodes {
 		if n.Model != SRN {

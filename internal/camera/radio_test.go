@@ -147,6 +147,9 @@ func TestRadioEvents(t *testing.T) {
 		t.Fatalf("first frame = %+v, want the siren asked for its state", f)
 	}
 
+	if _, err := c.ReadSensor(context.Background(), 23, "DWS", nil); err == nil {
+		t.Error("door state read before the door reported it")
+	}
 	mcu.rx(state(5, 10, 0)) // door opened
 	if ev := nextEvent(t, c); ev.SensorID != 23 || !ev.Sensor.Open || ev.Sensor.Type != "DWS" {
 		t.Errorf("event = %+v, want door 23 open", ev)
@@ -154,8 +157,17 @@ func TestRadioEvents(t *testing.T) {
 	if ack := mcu.sent(t); ack.GWDst != 5 || ack.AckCnt != 10 || ack.Flags != 0x0084 {
 		t.Errorf("ack = %+v, want fbxhome's DWS ack", ack)
 	}
+	if s, err := c.ReadSensor(context.Background(), 23, "DWS", nil); err != nil || !s.Open {
+		t.Errorf("read %+v %v, want open", s, err)
+	}
+	// Opened again (its close was lost): it must go out again.
+	mcu.rx(state(5, 11, 0))
+	if ev := nextEvent(t, c); ev.SensorID != 23 || !ev.Sensor.Open {
+		t.Errorf("event = %+v, want door 23 open again", ev)
+	}
+	mcu.sent(t)
 
-	mcu.rx(state(2, 11, 1)) // keypad day button
+	mcu.rx(state(2, 12, 1)) // keypad day button
 	if ev := nextEvent(t, c); ev.SensorID != 14 || ev.Sensor.KPDState != "armed_away" {
 		t.Errorf("event = %+v, want keypad 14 armed_away", ev)
 	}
@@ -163,7 +175,7 @@ func TestRadioEvents(t *testing.T) {
 
 	// A battery report must not replay the keypad's last button: main
 	// turns any KPDState into an alarm command.
-	mcu.rx(fromSensor(2, 12, 0x82, 0x81, 0xff))
+	mcu.rx(fromSensor(2, 13, 0x82, 0x81, 0xff))
 	if ev := nextEvent(t, c); ev.Sensor.KPDState != "" || ev.Sensor.Battery != 255 {
 		t.Errorf("event = %+v, want a battery update without action", ev)
 	}
@@ -172,22 +184,65 @@ func TestRadioEvents(t *testing.T) {
 	}
 }
 
-// TestRadioSiren: siren sequences go to the siren's radio address, routed,
-// and end with a stop.
+// TestRadioSiren: the wail carries its duration, in quarter seconds, like
+// fbxhome's: the siren stops by itself, no stop frame follows and the
+// call does not last the wail.
 func TestRadioSiren(t *testing.T) {
 	c, mcu, _ := newRadio(t, dws, srn)
 	mcu.sent(t) // get-state
 
-	if err := c.TriggerSirenAlarm(context.Background(), 29, 10*time.Millisecond); err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range [][]byte{sirenWake, sirenWail, sirenStop} {
-		if f := mcu.sent(t); f.Route != 6 || f.WFlags != 0x01 || !bytes.Equal(f.Payload, want) {
-			t.Errorf("frame = %+v, want %x to the siren", f, want)
+	for _, tc := range []struct {
+		d    time.Duration
+		want byte
+	}{{60 * time.Second, 0xf0}, {2 * time.Minute, 0xff}} {
+		if err := c.TriggerSirenAlarm(context.Background(), 29, tc.d); err != nil {
+			t.Fatal(err)
 		}
+		for _, want := range [][]byte{sirenWake, {0x55, 0x05, 0x01, 0x64, tc.want}} {
+			if f := mcu.sent(t); f.Route != 6 || f.WFlags != 0x01 || !bytes.Equal(f.Payload, want) {
+				t.Errorf("frame = %+v, want %x to the siren", f, want)
+			}
+		}
+		mcu.quiet(t)
 	}
 	if err := c.TriggerSirenAlarm(context.Background(), 23, 0); err == nil {
 		t.Error("a door was made to wail")
+	}
+}
+
+// TestRadioReachability: a frame the siren never got marks it
+// unreachable, its next frame reachable again.
+func TestRadioReachability(t *testing.T) {
+	c, mcu, _ := newRadio(t, srn)
+	start := mcu.sent(t)
+	// UNREACHABLE report, as the MCU words it (charmux TestMCUDeliveryReport).
+	report := []byte{0x01, 0x01, 0x00, 0x2a, 0x01, 0x40, 0x00, 0x01, byte(start.Counter)}
+	mcu.events <- charmux.Event{Channel: charmux.ChannelPKT, Data: report}
+	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.Reachable {
+		t.Errorf("event = %+v, want siren 29 unreachable", ev)
+	}
+	mcu.rx(charmux.ManagedFrame{GWDst: 1, GWSrc: 6, Counter: 40, Src: 6, Flags: 0x0082, WFlags: 0x01, Payload: []byte{0x55, 0x0e}})
+	if ev := nextEvent(t, c); ev.SensorID != 29 || !ev.Sensor.Reachable {
+		t.Errorf("event = %+v, want siren 29 reachable", ev)
+	}
+}
+
+// TestRadioSensorsNotServed: a sensor without a radio address, or a keypad
+// whose code is not valid, is not served and shows unreachable; the
+// keypad is not left to disarm with its off button alone.
+func TestRadioSensorsNotServed(t *testing.T) {
+	badKPD := kpd
+	badKPD.KPDCode = "12a4"
+	c, mcu, _ := newRadio(t, badKPD, config.SensorEntry{ID: 40, Type: "PIR"})
+	mcu.rx(fromSensor(2, 3, 0x01, 0x55, 0x09))
+	mcu.quiet(t)
+	for _, s := range c.CachedSensors() {
+		if s.Reachable {
+			t.Errorf("sensor %d shows reachable", s.ID)
+		}
+	}
+	if len(c.CachedSensors()) != 2 {
+		t.Errorf("sensors = %+v, want both listed", c.CachedSensors())
 	}
 }
 
@@ -276,9 +331,7 @@ func TestRadioKeypadCode(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.Reload(); err != nil {
-		t.Fatal(err)
-	}
+	c.Reload()
 	mcu.rx(fromSensor(2, 3, 0x01, 0x55, 0x09))
 	// '5'..'8' are 4..7, two digits a byte, low nibble first.
 	if f := mcu.sent(t); !bytes.Equal(f.Payload, []byte{0x03, 0x00, 0x04, 0x54, 0x76}) {
@@ -313,17 +366,26 @@ func writeFbxhomeXML(t *testing.T, path string, counter, next string) {
 	}
 }
 
-// TestImportFbxhomeRadio: the newest fbxhome state gives the sensors their
-// radio identity by id; deleted sensors and sensors that have one are
+// TestImportFbxhomeRadio: the newest fbxhome state that reads gives the
+// sensors their radio identity by id, and the keypad fbxhome's code when
+// the config has none; deleted sensors and sensors that have one are
 // left alone.
 func TestImportFbxhomeRadio(t *testing.T) {
 	dir := t.TempDir()
 	writeFbxhomeXML(t, filepath.Join(dir, "fbxhome.xml.3"), "12", "7")
 	writeFbxhomeXML(t, filepath.Join(dir, "fbxhome.xml.0"), "9", "5") // older
+	writeFbxhomeXML(t, filepath.Join(dir, "fbxhome.xml.5"), "13", "8")
+	cut, err := os.ReadFile(filepath.Join(dir, "fbxhome.xml.5"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "fbxhome.xml.5"), cut[:len(cut)/2], 0o600); err != nil {
+		t.Fatal(err) // the newest, cut short: fbxhome stopped while writing it
+	}
 	store := config.NewStore(filepath.Join(dir, "config.json"))
 	paired := config.RadioNode{Addr: 9, UID: "00000000000000ee", SystemIndex: 5}
 	if err := store.Update(func(c *config.Config) {
-		c.Sensors = []config.SensorEntry{{ID: 14, Type: "KPD", KPDCode: "1234"}, {ID: 29, Type: "SRN", Radio: paired}}
+		c.Sensors = []config.SensorEntry{{ID: 14, Type: "KPD"}, {ID: 29, Type: "SRN", Radio: paired}}
 		c.DeletedIDs = []int{20}
 	}); err != nil {
 		t.Fatal(err)
@@ -338,7 +400,7 @@ func TestImportFbxhomeRadio(t *testing.T) {
 	}
 	cfg := store.Get()
 	want := []config.SensorEntry{
-		{ID: 14, Type: "KPD", KPDCode: "1234", Radio: config.RadioNode{Addr: 2, UID: "00000000000000aa"}},
+		{ID: 14, Type: "KPD", KPDCode: "0000", Radio: config.RadioNode{Addr: 2, UID: "00000000000000aa"}},
 		{ID: 29, Type: "SRN", Radio: paired},
 		{ID: 17, Type: "PIR", Radio: config.RadioNode{Addr: 3, UID: "00000000000000bb", SystemIndex: 1}},
 	}

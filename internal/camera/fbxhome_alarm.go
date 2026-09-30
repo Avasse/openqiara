@@ -21,10 +21,11 @@ type AlarmTimings struct {
 // XML directly. fbxhome rotates /data/fbxhome.xml.0..9 in a wear-levelled
 // way, so we pick the file with the highest counter="N" attribute.
 func ReadAlarmTimings() (AlarmTimings, error) {
-	data, err := latestFbxhomeXML(fbxhomeXMLGlob)
+	states, err := fbxhomeStates(fbxhomeXMLGlob)
 	if err != nil {
 		return AlarmTimings{}, err
 	}
+	data := states[0]
 
 	t := AlarmTimings{}
 	intAttr := func(name string) int {

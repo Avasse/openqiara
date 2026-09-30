@@ -3007,7 +3007,7 @@
           },
           "fingerprint": {
             "type": "string",
-            "description": "Empreinte lue sur le QR code du capteur. Les espaces, tirets et majuscules sont tolérés ; seuls les 16 premiers caractères hexadécimaux comptent.",
+            "description": "Empreinte lue sur le QR code du capteur. Les espaces, tirets et majuscules sont tolérés ; seuls les 16 premiers caractères hexadécimaux comptent. Ignorée en mode `charmux` : le premier capteur du type demandé en mode appairage est retenu.",
             "examples": [
               "a4f4-d1ec-8ff1-376e"
             ]

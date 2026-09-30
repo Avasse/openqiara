@@ -50,18 +50,20 @@ func beacon() []byte {
 }
 
 // TestPairHandshake: the MCU's frames get fbxhome's answers, in order,
-// and the address comes from the result frame.
+// the address comes from the result frame, and a sensor of another type
+// in pairing mode is left alone.
 func TestPairHandshake(t *testing.T) {
 	mcu := &fakeMCU{}
 	frames := make(chan []byte, 8)
-	frames <- []byte{0x15} // the MCU's reply to START_PAIRING, ignored
+	frames <- []byte{0x15}                                         // the MCU's reply to START_PAIRING, ignored
+	frames <- append(beacon()[:15], []byte("HOMELABPIR00ACFD")...) // not the type asked for
 	frames <- beacon()
 	frames <- append([]byte{opPairChallenge}, testUID...)
 	frames <- append(append([]byte{opPairResult}, testUID...), 7, 0, 0, 0)
 	frames <- []byte{opStopPairing}
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	res, err := Pair(context.Background(), mcu, frames, []VendorKey{testKey}, 7, log)
+	res, err := Pair(context.Background(), mcu, frames, []VendorKey{testKey}, 7, "HOMELABDWS", log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +89,7 @@ func TestPairCancelStopsTheMCU(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
 	defer cancel()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	if _, err := Pair(ctx, mcu, make(chan []byte), []VendorKey{testKey}, 7, log); err == nil {
+	if _, err := Pair(ctx, mcu, make(chan []byte), []VendorKey{testKey}, 7, "HOMELABDWS", log); err == nil {
 		t.Fatal("pairing without a sensor succeeded")
 	}
 	ops := mcu.ops()

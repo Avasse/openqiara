@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/caligone/openqiara/internal/charmux"
@@ -51,10 +52,11 @@ type MCU interface {
 //
 // frames carries the CTRL frames the MCU sends meanwhile. addr is the
 // address to give the sensor: the MCU assigns it as is
-// (dws_repair_2026-05-16.pcap), so it must be unused. The sensor then
+// (dws_repair_2026-05-16.pcap), so it must be unused. Only a beacon whose
+// model starts with model (e.g. HOMELABPIR) is taken. The sensor then
 // sends a status heartbeat and gets provisioned like after any reboot,
 // which is the radio engine's job. Cancelling ctx stops the pairing.
-func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, addr byte, log *slog.Logger) (*PairingResult, error) {
+func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, addr byte, model string, log *slog.Logger) (*PairingResult, error) {
 	warmUp(ctx, "GetInfo", func(ctx context.Context) error { _, err := mcu.GetInfo(ctx); return err }, log)
 	warmUp(ctx, "GetNet", func(ctx context.Context) error { _, err := mcu.GetNet(ctx); return err }, log)
 
@@ -90,6 +92,10 @@ func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, 
 			key, ok := MatchBeacon(f, keys)
 			if !ok {
 				log.Warn("pairing: beacon of an unknown vendor")
+				continue
+			}
+			if beaconModel := string(trimNull(f[15:31])); !strings.HasPrefix(beaconModel, model) {
+				log.Warn("pairing: beacon of another sensor type ignored", "model", beaconModel, "want", model)
 				continue
 			}
 			matched = true

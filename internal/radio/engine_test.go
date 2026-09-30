@@ -273,14 +273,18 @@ func TestReconfiguration(t *testing.T) {
 	if got := config(5); !bytes.Equal(got, []byte{0x55, 0x00, 0x02, 9, 0, 0, 0}) {
 		t.Fatalf("after a new siren: %x", got)
 	}
+	e.SetAlarmSiren(9)
+	if got := config(7); len(got) != 0 {
+		t.Fatalf("same siren, config sent again: %x", got)
+	}
 	if err := e.SetNode(Node{Addr: 5, Model: DWS, SystemIndex: 4}); err != nil {
 		t.Fatal(err)
 	}
-	if got := config(7); !bytes.Equal(got, []byte{0x55, 0x00, 0x04, 9, 0, 0, 0}) {
+	if got := config(9); !bytes.Equal(got, []byte{0x55, 0x00, 0x04, 9, 0, 0, 0}) {
 		t.Fatalf("after a new system index: %x", got)
 	}
 	e.RemoveNode(5)
-	if got := e.Receive(now, heartbeat(5, 9, 0x81)); len(got.Send) != 0 || got.Events[0].Kind != UnknownSensor {
+	if got := e.Receive(now, heartbeat(5, 11, 0x81)); len(got.Send) != 0 || got.Events[0].Kind != UnknownSensor {
 		t.Fatalf("removed sensor: %+v", got)
 	}
 }
