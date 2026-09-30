@@ -65,7 +65,7 @@ func main() {
 	// sub-seconde sans pression sur fbxhome.
 	pollInterval := flag.Duration("poll", 5*time.Minute, "sensor poll interval (fbxhome backend, fallback only)")
 	webAddr := flag.String("web", ":80", "web UI listen address")
-	mode := flag.String("mode", "auto", "backend mode: fbxhome, charmux, or auto")
+	mode := flag.String("mode", "fbxhome", "backend: fbxhome, or charmux to be the radio gateway itself (fbxhome stopped)")
 	debugAPI := flag.Bool("debug", false, "enable /api/v1/commands/debug/* endpoints (PKT raw, siren raw — can brick the MCU)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	// logPath="" → stdout (dev). Sinon, lumberjack écrit dans le fichier
@@ -668,7 +668,7 @@ func main() {
 		return 0
 	}
 	// LogWatcher uniquement pour le backend fbxhome (tail syslog). En charmux,
-	// les events KPD viennent des PKT frames parsées par CharmuxClient.
+	// les events KPD viennent du moteur radio (camera.RadioClient).
 	if _, isFbx := cam.(*camera.FbxhomeClient); isFbx {
 		logWatcher := camera.NewLogWatcher("/var/log/fbxhome.log", lookupKPDID, camera.LogWatcherEventSink(kpdEvents), logger)
 		logWatcher.Start()
@@ -695,10 +695,8 @@ func main() {
 	}()
 
 	// In fbxhome mode the camera client polls /api/v1/home/endpoints_read
-	// on a fixed interval and emits SensorEvents on state changes. In
-	// charmux mode the cam.StartPolling is a no-op (charmux pushes events
-	// directly from PKT frames). Calling it unconditionally is safe: the
-	// no-op variants ignore the interval.
+	// on a fixed interval and emits SensorEvents on state changes. The
+	// charmux client has no StartPolling: the sensors report.
 	if poller, ok := cam.(interface {
 		StartPolling(context.Context, time.Duration)
 	}); ok {
@@ -756,11 +754,8 @@ func buildSensorList(ctx context.Context, cam camera.Client, store *config.Store
 		}
 	}
 
-	// Add live-cache sensors that are neither in the persisted config nor
-	// (yet) in the MCU node table. This covers freshly paired sensors —
-	// StartPairing populates c.sensors immediately but the config write
-	// happens through a separate path, and GetNodes can time out while
-	// charmux is still warming up.
+	// Add live-cache sensors that are not in the persisted config (fbxhome
+	// mode: a sensor fbxhome knows that openqiara never saved).
 	for _, live := range liveMap {
 		if seen[live.ID] || deletedIDs[live.ID] {
 			continue
@@ -801,8 +796,8 @@ func buildSensorList(ctx context.Context, cam camera.Client, store *config.Store
 	return sensors, nil
 }
 
-// createCamera picks the backend. auto tries charmux first: it fails
-// while fbxhome runs, as fbxhome holds the charmux ports.
+// createCamera picks the backend. There is no automatic choice: taking
+// the alarm's radio over must be asked for.
 func createCamera(ctx context.Context, mode string, store *config.Store, logger *slog.Logger) camera.Client {
 	switch mode {
 	case "charmux":
@@ -810,12 +805,8 @@ func createCamera(ctx context.Context, mode string, store *config.Store, logger 
 	case "fbxhome":
 		return createFbxhomeClient(ctx, logger)
 	default:
-		c := createCharmuxClient(ctx, store, logger)
-		if c != nil {
-			return c
-		}
-		logger.Info("charmux unavailable, falling back to fbxhome")
-		return createFbxhomeClient(ctx, logger)
+		logger.Error("unknown -mode", "mode", mode)
+		return nil
 	}
 }
 

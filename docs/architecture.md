@@ -38,8 +38,9 @@ Le binaire fbxhome est patché (2 NOPs) pour découpler le KPD de la machine à
 ## Modes caméra
 
 OpenQiara peut parler au MCU de deux façons, sélectionnées au démarrage via
-`-mode fbxhome|charmux|auto`. Le mode de production est **fbxhome** ; le
-mode **charmux** doit le remplacer.
+`-mode fbxhome|charmux` (défaut `fbxhome`, le mode de production) ; le mode
+**charmux** doit le remplacer. Aucun choix automatique : prendre la radio de
+l'alarme se demande explicitement.
 
 ### Mode fbxhome (par défaut, recommandé)
 
@@ -83,9 +84,14 @@ Alarmo. Le mode jour/nuit passe par `fbxbusctl set hlcamd video_settings`,
 le volet par le canal charmux 8006/8007.
 
 Le démarrage échoue tant que fbxhome tourne : il tient les ports charmux.
-`-mode auto` retombe alors sur le mode fbxhome. Retour arrière : relancer
-fbxhome, dont l'état est intact. `-log-level debug` trace chaque trame
-(sans les codes clavier).
+Retour arrière : relancer fbxhome, dont l'état est intact tant qu'aucun
+capteur n'a été appairé ni supprimé en mode charmux (fbxhome ne le saurait
+pas et redonnerait une adresse déjà prise). `-log-level debug` trace chaque
+trame (sans les codes clavier).
+
+La sirène reçoit la durée du wail dans la trame et s'arrête d'elle-même,
+comme avec fbxhome. Pas de bip d'armement ni de désarmement : leurs trames
+font passer la sirène par ses propres états, question ouverte.
 
 Pas encore validé sur matériel ; non géré : capteurs derrière un répéteur,
 redémarrage à distance de la sirène.

@@ -9,6 +9,7 @@ bin/
 # Local binaries (root-of-repo build artifacts)
 /openqiarad
 /openqiarad_*
+/test-pair-domusvm
 
 # OS
 .DS_Store
