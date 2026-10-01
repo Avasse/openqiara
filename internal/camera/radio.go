@@ -197,7 +197,7 @@ func (c *RadioClient) reload() {
 		}
 		s, ok := c.sensors[se.ID]
 		if !ok {
-			s = Sensor{ID: se.ID, Reachable: true}
+			s = Sensor{ID: se.ID, Reachable: true, Battery: se.Battery}
 		}
 		s.Type, s.ItemID = se.Type, se.Radio.UID
 		if se.Radio.Addr == 0 {
@@ -346,6 +346,9 @@ func (c *RadioClient) publish(ev radio.Event) {
 		c.emit(action)
 		return
 	case radio.Battery:
+		if ev.Value != s.Battery {
+			c.saveBattery(id, ev.Value)
+		}
 		s.Battery = ev.Value
 	case radio.DeliveryFailed:
 		s.Reachable = false
@@ -370,6 +373,20 @@ func (c *RadioClient) publish(ev radio.Event) {
 	c.sensors[id] = s
 	if report || s != before {
 		c.emit(s)
+	}
+}
+
+// saveBattery keeps a sensor's battery level for the next start, which
+// would otherwise publish 0 until the sensor's next heartbeat, hours
+// later. Called with mu held.
+func (c *RadioClient) saveBattery(id, level int) {
+	err := c.store.Update(func(cfg *config.Config) {
+		if i := slices.IndexFunc(cfg.Sensors, func(se config.SensorEntry) bool { return se.ID == id }); i >= 0 {
+			cfg.Sensors[i].Battery = level
+		}
+	})
+	if err != nil {
+		c.log.Warn("radio: battery level not saved", "id", id, "error", err)
 	}
 }
 

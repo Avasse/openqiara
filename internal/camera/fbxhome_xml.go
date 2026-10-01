@@ -74,6 +74,7 @@ type fbxhomeRadio struct {
 		Addr        uint32        `xml:"domus_addr,attr"`
 		UID         string        `xml:"domus_item_id,attr"`
 		SystemIndex uint8         `xml:"system_index,attr"`
+		Battery     int           `xml:"battery,attr"`
 		Codes       []fbxhomeCode `xml:"Code"`
 	} `xml:"Node"`
 }
@@ -137,6 +138,7 @@ func ImportFbxhomeRadio(store *config.Store, glob string) ([]int, error) {
 			se := &cfg.Sensors[i]
 			se.Type = sensorTypeFromNodeType[n.Type]
 			se.Radio = config.RadioNode{Addr: n.Addr, UID: n.UID, SystemIndex: n.SystemIndex}
+			se.Battery = n.Battery
 			if se.Type == "KPD" && se.KPDCode == "" {
 				if c := slices.IndexFunc(n.Codes, func(c fbxhomeCode) bool { return c.Valid }); c >= 0 {
 					se.KPDCode = n.Codes[c].Password

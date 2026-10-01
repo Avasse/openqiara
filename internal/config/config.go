@@ -292,6 +292,10 @@ type SensorEntry struct {
 	// mode (fbxhome keeps it in its own XML): set at pairing, imported
 	// from fbxhome.xml when openqiarad takes the radio over.
 	Radio RadioNode `json:"radio,omitzero"`
+	// Battery is the last level the sensor reported (charmux mode), kept
+	// across restarts as fbxhome keeps it: sensors report it every few
+	// hours only.
+	Battery int `json:"battery,omitempty"`
 }
 
 // RadioNode is a sensor's place on the radio network. Addr 0 means none.

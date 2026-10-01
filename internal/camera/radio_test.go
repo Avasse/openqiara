@@ -142,7 +142,12 @@ func nextEvent(t *testing.T, c *RadioClient) SensorEvent {
 // TestRadioEvents: frames of sensors imported from fbxhome come out under
 // their fbxhome ids, and get answered.
 func TestRadioEvents(t *testing.T) {
-	c, mcu, _ := newRadio(t, kpd, dws, srn)
+	siren := srn
+	siren.Battery = 76 // last level saved: no 0 published before its heartbeat
+	c, mcu, store := newRadio(t, kpd, dws, siren)
+	if s, _ := c.ReadSensor(context.Background(), 29, "SRN", nil); s == nil || s.Battery != 76 {
+		t.Errorf("siren at start = %+v, want its saved battery", s)
+	}
 	if f := mcu.sent(t); f.Route != 6 || !bytes.Equal(f.Payload, []byte{0x55, 0x06}) {
 		t.Fatalf("first frame = %+v, want the siren asked for its state", f)
 	}
@@ -178,6 +183,9 @@ func TestRadioEvents(t *testing.T) {
 	mcu.rx(fromSensor(2, 13, 0x82, 0x81, 0xff))
 	if ev := nextEvent(t, c); ev.Sensor.KPDState != "" || ev.Sensor.Battery != 255 {
 		t.Errorf("event = %+v, want a battery update without action", ev)
+	}
+	if b := store.Get().Sensors[0].Battery; b != 255 {
+		t.Errorf("battery saved as %d, want 255 for the next start", b)
 	}
 	if f := mcu.sent(t); f.GWDst != 2 || f.WFlags != 0xcc {
 		t.Errorf("answer = %+v, want read_status", f)
@@ -348,7 +356,7 @@ const fbxhomeXMLTemplate = `<?xml version="1.0" encoding="utf-8"?>
   <Node adapter="12" discarded="false" domus_addr="2" domus_ch_key="secret" domus_item_id="00000000000000aa" domus_key="secret" id="14" system_index="0" type="Node.DomusNode.HLKpd">
     <Code label="admin" password="0000" valid="true" />
   </Node>
-  <Node adapter="12" discarded="false" domus_addr="3" domus_item_id="00000000000000bb" id="17" system_index="1" type="Node.DomusNode.HlPir">
+  <Node adapter="12" battery="255" discarded="false" domus_addr="3" domus_item_id="00000000000000bb" id="17" system_index="1" type="Node.DomusNode.HlPir">
   </Node>
   <Node adapter="12" discarded="false" domus_addr="4" domus_item_id="00000000000000cc" id="20" system_index="4" type="Node.DomusNode.HlDws">
   </Node>
@@ -402,7 +410,7 @@ func TestImportFbxhomeRadio(t *testing.T) {
 	want := []config.SensorEntry{
 		{ID: 14, Type: "KPD", KPDCode: "0000", Radio: config.RadioNode{Addr: 2, UID: "00000000000000aa"}},
 		{ID: 29, Type: "SRN", Radio: paired},
-		{ID: 17, Type: "PIR", Radio: config.RadioNode{Addr: 3, UID: "00000000000000bb", SystemIndex: 1}},
+		{ID: 17, Type: "PIR", Radio: config.RadioNode{Addr: 3, UID: "00000000000000bb", SystemIndex: 1}, Battery: 255},
 	}
 	if !slices.Equal(cfg.Sensors, want) || cfg.RadioNextAddr != 7 {
 		t.Errorf("config = %+v next %d,\nwant %+v next 7", cfg.Sensors, cfg.RadioNextAddr, want)
