@@ -8,8 +8,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/caligone/openqiara/internal/charmux"
 )
 
 // fakeMCU records the CTRL frames Pair sends.
@@ -18,8 +16,6 @@ type fakeMCU struct {
 	sent [][]byte
 }
 
-func (m *fakeMCU) GetInfo(context.Context) (*charmux.MCUInfo, error) { return &charmux.MCUInfo{}, nil }
-func (m *fakeMCU) GetNet(context.Context) (byte, error)              { return 5, nil }
 func (m *fakeMCU) SendRawCTRL(b []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -69,11 +65,12 @@ func TestPairHandshake(t *testing.T) {
 	if res.Address != 7 || res.Model != "HOMELABDWS00ACFD" || !bytes.Equal(res.DeviceUID[:], testUID) {
 		t.Errorf("result = %+v", res)
 	}
-	want := []byte{opStartPairing, opStartPairing, opPairRequest, opPairConfirm, opStopPairing}
+	// fbxhome's sequence: one start, no echo of the MCU's stop.
+	want := []byte{opStartPairing, opPairRequest, opPairConfirm}
 	if got := mcu.ops(); !bytes.Equal(got, want) {
 		t.Errorf("CTRL sent %x, want %x", got, want)
 	}
-	start, request := mcu.sent[0], mcu.sent[2]
+	start, request := mcu.sent[0], mcu.sent[1]
 	if len(start) != 18 || start[1] != 7 || start[5] != 7 {
 		t.Errorf("start = %x, want the address at 1 and 5", start)
 	}

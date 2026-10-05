@@ -63,6 +63,8 @@ type RadioClient struct {
 // radioMCU is the part of charmux.Client the radio client uses.
 type radioMCU interface {
 	domus.MCU
+	GetInfo(ctx context.Context) (*charmux.MCUInfo, error)
+	GetNet(ctx context.Context) (byte, error)
 	Connect(ctx context.Context) error
 	SendPKT(ctx context.Context, data []byte) error
 	SendShutter(open bool) error

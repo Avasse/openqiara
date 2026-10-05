@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
-
-	"github.com/caligone/openqiara/internal/charmux"
 )
 
 // Pairing opcodes on the CTRL channel.
@@ -32,23 +29,22 @@ type PairingResult struct {
 
 // MCU is the part of charmux.Client that pairing drives.
 type MCU interface {
-	GetInfo(ctx context.Context) (*charmux.MCUInfo, error)
-	GetNet(ctx context.Context) (byte, error)
 	SendRawCTRL(data []byte) error
 }
 
-// Pair adds a sensor to the MCU's radio network with the CTRL handshake
-// captured from fbxhome (2026-03-31), in the order that persists in the
-// MCU (memory feedback_pairing_protocol):
+// Pair adds a sensor to the MCU's radio network with fbxhome's CTRL
+// handshake, as captured in dws_repair_2026-05-16.pcap:
 //
-//  1. GetInfo, GetNet, then START_PAIRING (0x15) twice: the first one
-//     wakes the MCU up. (fbxhome also sent 0x05 on the watchdog channel
-//     in between: that is watchdog_mcu's keep-alive, unrelated.)
+//  1. START_PAIRING (0x15), once.
 //  2. Beacon (0x17) of the sensor put in pairing mode → pair request
 //     (0x1a) with the vendor key matching the beacon.
 //  3. Challenge (0x1f) → confirm (0x1c).
-//  4. Result (0x1e) with the address, then stop (0x16), echoed: without
-//     the echo the pairing does not persist.
+//  4. Result (0x1e) with the address, then the MCU's stop (0x16).
+//
+// Nothing more: the GetInfo/GetNet warm-up, the second 0x15 and the echo
+// of the MCU's 0x16 came from trials in April 2026, not from fbxhome, and
+// after that echo the MCU no longer answered CTRL until a reboot (seen
+// live 2026-10-05). The pairing persists without them.
 //
 // frames carries the CTRL frames the MCU sends meanwhile. addr is the
 // address to give the sensor: the MCU assigns it as is
@@ -57,17 +53,8 @@ type MCU interface {
 // sends a status heartbeat and gets provisioned like after any reboot,
 // which is the radio engine's job. Cancelling ctx stops the pairing.
 func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, addr byte, model string, log *slog.Logger) (*PairingResult, error) {
-	warmUp(ctx, "GetInfo", func(ctx context.Context) error { _, err := mcu.GetInfo(ctx); return err }, log)
-	warmUp(ctx, "GetNet", func(ctx context.Context) error { _, err := mcu.GetNet(ctx); return err }, log)
-
 	start := make([]byte, 18)
 	start[0], start[1], start[5] = opStartPairing, addr, addr
-	if err := mcu.SendRawCTRL(start); err != nil {
-		return nil, fmt.Errorf("pairing: start: %w", err)
-	}
-	if err := sleep(ctx, 500*time.Millisecond); err != nil {
-		return nil, stop(mcu, err)
-	}
 	if err := mcu.SendRawCTRL(start); err != nil {
 		return nil, fmt.Errorf("pairing: start: %w", err)
 	}
@@ -110,9 +97,6 @@ func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, 
 		case op == opPairResult && matched && len(f) >= 10:
 			res.Address = f[9]
 		case op == opStopPairing && matched:
-			if err := mcu.SendRawCTRL([]byte{opStopPairing}); err != nil {
-				return nil, fmt.Errorf("pairing: stop echo: %w", err)
-			}
 			if res.Address == 0 {
 				return nil, errors.New("pairing: the MCU stopped before assigning an address")
 			}
@@ -127,29 +111,10 @@ func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, 
 	}
 }
 
-// warmUp runs a CTRL request the way fbxhome opens a pairing, bounded so
-// that a silent MCU does not eat the pairing window.
-func warmUp(ctx context.Context, name string, req func(context.Context) error, log *slog.Logger) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	if err := req(ctx); err != nil {
-		log.Warn("pairing: "+name+" failed", "error", err)
-	}
-}
-
-// stop takes the MCU out of pairing mode after a failure.
+// stop takes the MCU out of pairing mode when the pairing is given up.
 func stop(mcu MCU, cause error) error {
 	_ = mcu.SendRawCTRL([]byte{opStopPairing})
 	return cause
-}
-
-func sleep(ctx context.Context, d time.Duration) error {
-	select {
-	case <-time.After(d):
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 func trimNull(b []byte) []byte {
