@@ -277,17 +277,21 @@ func (c *RadioClient) receive(data []byte) {
 		return
 	}
 	c.trace("rx", rx.Src, *rx)
-	if id, ok := c.ids[rx.Src]; ok && rx.Flags&(charmux.FlagZ|charmux.FlagW|charmux.FlagA) != 0 {
+	id, back := c.ids[rx.Src], false
+	if _, ok := c.ids[rx.Src]; ok && rx.Flags&(charmux.FlagZ|charmux.FlagW|charmux.FlagA) != 0 {
 		// A sensor frame, not an MCU report: the sensor is there.
 		s := c.sensors[id]
 		s.LastSeen = time.Now().Unix()
-		if !s.Reachable {
-			s.Reachable = true
-			c.emit(s)
-		}
+		back, s.Reachable = !s.Reachable, true
 		c.sensors[id] = s
 	}
 	_ = c.send(c.engine.Receive(time.Now(), *rx))
+	if back {
+		// Published after the frame's own events: before, it would repeat
+		// the state the sensor had when it went missing, and a repeated
+		// open is an intrusion to the alarm.
+		c.emit(c.sensors[id])
+	}
 }
 
 // send puts the engine's frames on the air and publishes its events. A

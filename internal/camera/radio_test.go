@@ -444,3 +444,27 @@ func TestRadioPairingLimit(t *testing.T) {
 		t.Fatal("pairing allowed after too many failures")
 	}
 }
+
+// TestRadioBackPublishesFreshState: a door that went unreachable while open
+// and comes back closed is published closed, never open again (a repeated
+// open is an intrusion).
+func TestRadioBackPublishesFreshState(t *testing.T) {
+	c, mcu, _ := newRadio(t, dws)
+	mcu.rx(state(5, 10, 0)) // opened
+	if ev := nextEvent(t, c); !ev.Sensor.Open {
+		t.Fatalf("event = %+v, want open", ev)
+	}
+	ack := mcu.sent(t)
+	// The MCU could not deliver the ack: the door is unreachable.
+	report := []byte{0x01, 0x01, 0x00, 0x2a, 0x01, 0x40, 0x00, 0x01, byte(ack.Counter)}
+	mcu.events <- charmux.Event{Channel: charmux.ChannelPKT, Data: report}
+	if ev := nextEvent(t, c); ev.Sensor.Reachable {
+		t.Fatalf("event = %+v, want unreachable", ev)
+	}
+	mcu.rx(state(5, 11, 1)) // closed
+	for range 2 {
+		if ev := nextEvent(t, c); ev.Sensor.Open {
+			t.Fatalf("event = %+v: stale open published", ev)
+		}
+	}
+}
