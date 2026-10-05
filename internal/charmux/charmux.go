@@ -84,20 +84,6 @@ func (c *Client) Connect(ctx context.Context) error {
 		}
 	}
 
-	// Watchdog channel: send 0x05 to 8004 (captured from fbxhome init)
-	// Don't bind 8005 (watchdog_mcu process owns it) — use unbound socket
-	wdAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", c.host, 8004))
-	if err == nil {
-		wdConn, wdErr := net.DialUDP("udp4", nil, wdAddr)
-		if wdErr == nil {
-			_, _ = wdConn.Write([]byte{0x05})
-			_ = wdConn.Close()
-			c.log.Info("charmux: watchdog init sent (0x05)")
-		} else {
-			c.log.Warn("charmux: watchdog init failed", "err", wdErr)
-		}
-	}
-
 	// No shutter byte here: fbxhome sends 0x02 when it starts, but 0x02
 	// closes the shutter (SendShutter), and a restart must not.
 
@@ -176,21 +162,6 @@ func (c *Client) SendRawCTRL(data []byte) error {
 func (c *Client) SendPKT(_ context.Context, data []byte) error {
 	_, err := c.pktConn.Write(data)
 	return err
-}
-
-// SendWatchdog sends 0x05 on the watchdog channel (8005→8004).
-// This may trigger NVM commit on the MCU for pairing persistence.
-func (c *Client) SendWatchdog() {
-	wdAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", c.host, 8004))
-	if err != nil {
-		return
-	}
-	conn, err := net.DialUDP("udp4", nil, wdAddr)
-	if err != nil {
-		return
-	}
-	_, _ = conn.Write([]byte{0x05})
-	_ = conn.Close()
 }
 
 // SendShutter sends a command on the Shutter channel.

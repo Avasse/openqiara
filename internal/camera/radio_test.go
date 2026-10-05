@@ -36,7 +36,6 @@ func (m *fakeMCU) GetInfo(context.Context) (*charmux.MCUInfo, error) {
 	return &charmux.MCUInfo{Address: 1}, nil
 }
 func (m *fakeMCU) GetNet(context.Context) (byte, error) { return 5, nil }
-func (m *fakeMCU) SendWatchdog()                        {}
 func (m *fakeMCU) SendShutter(bool) error               { return nil }
 func (m *fakeMCU) Events() chan charmux.Event           { return m.events }
 func (m *fakeMCU) Close() error                         { close(m.events); return nil }

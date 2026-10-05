@@ -35,15 +35,15 @@ type MCU interface {
 	GetInfo(ctx context.Context) (*charmux.MCUInfo, error)
 	GetNet(ctx context.Context) (byte, error)
 	SendRawCTRL(data []byte) error
-	SendWatchdog()
 }
 
 // Pair adds a sensor to the MCU's radio network with the CTRL handshake
 // captured from fbxhome (2026-03-31), in the order that persists in the
 // MCU (memory feedback_pairing_protocol):
 //
-//  1. GetInfo, GetNet, then START_PAIRING (0x15) twice with a watchdog
-//     ping in between: the first one wakes the MCU up.
+//  1. GetInfo, GetNet, then START_PAIRING (0x15) twice: the first one
+//     wakes the MCU up. (fbxhome also sent 0x05 on the watchdog channel
+//     in between: that is watchdog_mcu's keep-alive, unrelated.)
 //  2. Beacon (0x17) of the sensor put in pairing mode → pair request
 //     (0x1a) with the vendor key matching the beacon.
 //  3. Challenge (0x1f) → confirm (0x1c).
@@ -65,7 +65,6 @@ func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, 
 	if err := mcu.SendRawCTRL(start); err != nil {
 		return nil, fmt.Errorf("pairing: start: %w", err)
 	}
-	mcu.SendWatchdog()
 	if err := sleep(ctx, 500*time.Millisecond); err != nil {
 		return nil, stop(mcu, err)
 	}
@@ -114,7 +113,6 @@ func Pair(ctx context.Context, mcu MCU, frames <-chan []byte, keys []VendorKey, 
 			if err := mcu.SendRawCTRL([]byte{opStopPairing}); err != nil {
 				return nil, fmt.Errorf("pairing: stop echo: %w", err)
 			}
-			mcu.SendWatchdog()
 			if res.Address == 0 {
 				return nil, errors.New("pairing: the MCU stopped before assigning an address")
 			}

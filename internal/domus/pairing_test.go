@@ -20,7 +20,6 @@ type fakeMCU struct {
 
 func (m *fakeMCU) GetInfo(context.Context) (*charmux.MCUInfo, error) { return &charmux.MCUInfo{}, nil }
 func (m *fakeMCU) GetNet(context.Context) (byte, error)              { return 5, nil }
-func (m *fakeMCU) SendWatchdog()                                     {}
 func (m *fakeMCU) SendRawCTRL(b []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

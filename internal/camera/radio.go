@@ -454,10 +454,6 @@ func (c *RadioClient) StartPairing(_ context.Context, sensorType, _ string) (int
 		res, err := domus.Pair(ctx, c.mcu, p.frames, c.keys, addr, model, c.log)
 		if err == nil {
 			p.sensor, err = c.adopt(res)
-			// The sequence validated in April 2026 ends with a watchdog
-			// ping once the sensor is provisioned; whether the MCU needs
-			// it is not known.
-			time.AfterFunc(3*time.Second, c.mcu.SendWatchdog)
 		}
 		p.err = err
 	}()
