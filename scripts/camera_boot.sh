@@ -248,6 +248,20 @@ fi
 # cas où lumberjack se planterait (cap dur à 4 MB par fichier).
 /data/openqiarad -web :80 -mode fbxhome -log /data/openqiarad.log >/dev/null 2>&1 &
 
+# Stop the vendor watchdog from rebooting the camera every ~12 h 06.
+# watchdog_mcu keeps the MCU's 15-minute hardware watchdog fed only while
+# the Free cloud VPN exchanged keys within its timeout, 43200 s by default
+# (RE 2026-10-02): the cloud is dead, so 12 h after boot it stops and the
+# MCU powers the camera off. set_timeout raises that limit (~63 years);
+# its other checks (hlcamd alive, services up) still apply. watchdog_mcu
+# starts once myriadvpn is up, hence the retries.
+(
+    for i in $(seq 1 30); do
+        fbxbusctl call watchdog_mcu set_timeout 2000000000 >/dev/null 2>&1 && break
+        sleep 10
+    done
+) &
+
 # Resume hlcamd video streams in the background. hlcamd starts paused
 # and needs time to register on fbxbus before resume_streams works.
 (sleep 10; fbxbusctl call hlcamd resume_streams 2>/dev/null) &
