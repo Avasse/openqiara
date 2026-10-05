@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -345,28 +346,60 @@ func (s *Store) Load() error {
 func (s *Store) Save() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.save()
+}
 
+// save writes the file whole or not at all: a full /data or a power cut
+// leaves the previous config, never a truncated one. In charmux mode it
+// is the registry of the paired sensors.
+func (s *Store) save() error {
 	data, err := json.MarshalIndent(s.cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	if err := os.WriteFile(s.path, data, 0600); err != nil {
+	tmp := s.path + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err == nil {
+		_, err = f.Write(data)
+		if err == nil {
+			err = f.Sync()
+		}
+		err = errors.Join(err, f.Close())
+	}
+	if err == nil {
+		err = os.Rename(tmp, s.path)
+	}
+	if err != nil {
+		_ = os.Remove(tmp)
 		return fmt.Errorf("write config: %w", err)
 	}
 	return nil
 }
 
-// Get returns a copy of the current configuration.
+// Get returns a copy of the current configuration. The copy shares
+// nothing with the store: Update may change sensors in place.
 func (s *Store) Get() Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.cfg
+	return s.cfg.clone()
 }
 
 // Update applies a mutation function to the configuration and saves it.
+// If the save fails, the mutation is undone.
 func (s *Store) Update(fn func(*Config)) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	old := s.cfg.clone()
 	fn(&s.cfg)
-	s.mu.Unlock()
-	return s.Save()
+	if err := s.save(); err != nil {
+		s.cfg = old
+		return err
+	}
+	return nil
+}
+
+func (c Config) clone() Config {
+	c.Sensors = slices.Clone(c.Sensors)
+	c.DeletedIDs = slices.Clone(c.DeletedIDs)
+	return c
 }

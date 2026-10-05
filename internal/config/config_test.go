@@ -150,3 +150,45 @@ func TestStoreLoadMigratesLegacyPassword(t *testing.T) {
 		t.Error("migrated config should accept the original password")
 	}
 }
+
+// TestGetSharesNothing: an Update that edits a sensor in place must not
+// show through a copy taken before (the radio client reads copies while
+// the web server edits).
+func TestGetSharesNothing(t *testing.T) {
+	s := NewStore(filepath.Join(t.TempDir(), "config.json"))
+	if err := s.Update(func(c *Config) { c.Sensors = []SensorEntry{{ID: 14, KPDCode: "1234"}} }); err != nil {
+		t.Fatal(err)
+	}
+	before := s.Get()
+	if err := s.Update(func(c *Config) { c.Sensors[0].KPDCode = "5678" }); err != nil {
+		t.Fatal(err)
+	}
+	if before.Sensors[0].KPDCode != "1234" {
+		t.Errorf("copy changed to %q", before.Sensors[0].KPDCode)
+	}
+}
+
+// TestFailedUpdateChangesNothing: when the config cannot be written, the
+// file and the store keep the previous config.
+func TestFailedUpdateChangesNothing(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	s := NewStore(path)
+	if err := s.Update(func(c *Config) { c.DeletedIDs = []int{7} }); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil { // no new file in dir
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(dir, 0o700) }()
+	if err := s.Update(func(c *Config) { c.DeletedIDs = []int{8} }); err == nil {
+		t.Skip("directory still writable (running as root?)")
+	}
+	if len(s.Get().DeletedIDs) != 1 || s.Get().DeletedIDs[0] != 7 {
+		t.Errorf("store kept %v, want [7]", s.Get().DeletedIDs)
+	}
+	reread := NewStore(path)
+	if err := reread.Load(); err != nil || len(reread.Get().DeletedIDs) != 1 || reread.Get().DeletedIDs[0] != 7 {
+		t.Errorf("file holds %v (%v), want [7]", reread.Get().DeletedIDs, err)
+	}
+}
