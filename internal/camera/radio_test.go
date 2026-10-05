@@ -419,3 +419,28 @@ func TestImportFbxhomeRadio(t *testing.T) {
 		t.Errorf("second import = %v %v, want nothing", ids, err)
 	}
 }
+
+// TestRadioPairingLimit: after maxFailedPairings failures in a row, pairing
+// is refused, so as not to wedge the MCU.
+func TestRadioPairingLimit(t *testing.T) {
+	c, mcu, _ := newRadio(t, srn)
+	mcu.sent(t)
+	for i := range maxFailedPairings {
+		if _, err := c.StartPairing(context.Background(), "PIR", ""); err != nil {
+			t.Fatalf("attempt %d refused: %v", i+1, err)
+		}
+		if err := c.StopPairing(context.Background(), 1); err != nil {
+			t.Fatal(err)
+		}
+		for {
+			_, done, err := c.PollPairing(context.Background(), 1)
+			if done || err != nil {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	if _, err := c.StartPairing(context.Background(), "PIR", ""); err == nil {
+		t.Fatal("pairing allowed after too many failures")
+	}
+}

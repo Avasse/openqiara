@@ -57,6 +57,7 @@ type RadioClient struct {
 	ids     map[uint32]int     // radio address → id
 	known   map[int]bool       // door or motion state reported since start
 	pairing *pairing
+	failed  int // pairings that failed since the last success
 }
 
 // radioMCU is the part of charmux.Client the radio client uses.
@@ -82,6 +83,11 @@ type pairing struct {
 // pairingWindow is how long a pairing waits for the sensor, like the old
 // charmux client.
 const pairingWindow = 2 * time.Minute
+
+// maxFailedPairings caps the pairings that may fail in a row: past ~8 the
+// MCU stops answering on CTRL until the camera is power-cycled (memory
+// feedback_pairing_protocol, docs/re-bypass/09).
+const maxFailedPairings = 3
 
 var errRadioStopped = errors.New("radio: gateway stopped")
 
@@ -441,6 +447,9 @@ func (c *RadioClient) StartPairing(_ context.Context, sensorType, _ string) (int
 	if c.pairing != nil && !isClosed(c.pairing.done) {
 		return 0, errors.New("radio: a pairing is already running")
 	}
+	if c.failed >= maxFailedPairings {
+		return 0, fmt.Errorf("radio: %d pairings failed in a row, restart the camera before trying again", c.failed)
+	}
 	addr, err := c.reserveAddr()
 	if err != nil {
 		return 0, err
@@ -455,6 +464,13 @@ func (c *RadioClient) StartPairing(_ context.Context, sensorType, _ string) (int
 		if err == nil {
 			p.sensor, err = c.adopt(res)
 		}
+		c.mu.Lock()
+		if err != nil {
+			c.failed++
+		} else {
+			c.failed = 0
+		}
+		c.mu.Unlock()
 		p.err = err
 	}()
 	return 1, nil
