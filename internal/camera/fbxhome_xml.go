@@ -61,6 +61,14 @@ func fbxhomeStates(glob string) ([][]byte, error) {
 	return out, nil
 }
 
+// sensorTypeFromNodeType maps fbxhome's node types to sensor types.
+var sensorTypeFromNodeType = map[string]string{
+	"Node.DomusNode.HlDws": "DWS",
+	"Node.DomusNode.HlPir": "PIR",
+	"Node.DomusNode.HlSrn": "SRN",
+	"Node.DomusNode.HLKpd": "KPD",
+}
+
 // fbxhomeRadio is what openqiarad takes from fbxhome's state when it
 // takes the radio over. The sensors' keys it holds are not read.
 type fbxhomeRadio struct {

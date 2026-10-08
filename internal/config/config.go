@@ -263,15 +263,6 @@ func HashAdminPassword(plaintext string) (string, error) {
 }
 
 // SensorEntry holds a paired sensor's persistent data.
-//
-// Day/Night alarm flags mirror fbxhome's ExportLink properties:
-//   - DayAlarm/NightAlarm: true = sensor triggers the alarm in that mode.
-//     Default true (set explicitly at sensor creation).
-//   - DayTimed/NightTimed: true = sensor honours timeout_before_alert before
-//     firing (entry/exit delay). Default true.
-//
-// In standalone alarm mode, NightAllowed (legacy) is still consulted; in
-// fbxhome bridge mode the new fields are pushed to fbxhome.
 type SensorEntry struct {
 	ID           int    `json:"id"`
 	Type         string `json:"type"`
@@ -279,22 +270,13 @@ type SensorEntry struct {
 	Label        string `json:"label,omitempty"`
 	KPDCode      string `json:"kpd_code,omitempty"`
 	KPDCodeLabel string `json:"kpd_code_label,omitempty"`
-	NightAllowed bool   `json:"night_allowed,omitempty"` // legacy: standalone mode only
+	NightAllowed bool   `json:"night_allowed,omitempty"` // ignored by the alarm when armed for the night
 
-	// fbxhome ExportLink-backed flags. *bool so we can detect "unset" vs
-	// "explicitly false". Unset = inherit fbxhome default (true).
-	DayAlarm   *bool `json:"day_alarm,omitempty"`
-	NightAlarm *bool `json:"night_alarm,omitempty"`
-	DayTimed   *bool `json:"day_timed,omitempty"`
-	NightTimed *bool `json:"night_timed,omitempty"`
-
-	// Radio is where the sensor sits on the radio network, for charmux
-	// mode (fbxhome keeps it in its own XML): set at pairing, imported
-	// from fbxhome.xml when openqiarad takes the radio over.
+	// Radio is where the sensor sits on the radio network: set at
+	// pairing, imported from fbxhome.xml at the first start.
 	Radio RadioNode `json:"radio,omitzero"`
-	// Battery is the last level the sensor reported (charmux mode), kept
-	// across restarts as fbxhome keeps it: sensors report it every few
-	// hours only.
+	// Battery is the last level the sensor reported, kept across restarts:
+	// sensors report it every few hours only.
 	Battery int `json:"battery,omitempty"`
 }
 
@@ -339,6 +321,7 @@ func (s *Store) Load() error {
 	if err := json.Unmarshal(data, &s.cfg); err != nil {
 		return fmt.Errorf("parse config: %w", err)
 	}
+	migrateNightAlarm(&s.cfg, data)
 
 	// Migration legacy : si on a un password en clair (ancien schéma)
 	// et pas de hash, on hash maintenant. Le Save() est différé jusqu'à
@@ -356,6 +339,32 @@ func (s *Store) Load() error {
 		// fallback CheckPassword.
 	}
 	return nil
+}
+
+// migrateNightAlarm folds night_alarm, the fbxhome flag "triggers when
+// armed for the night", into night_allowed, its opposite, which it
+// overrode. The other fbxhome flags (day_alarm, day_timed, night_timed)
+// never reached the alarm: they are dropped at the next save.
+func migrateNightAlarm(cfg *Config, data []byte) {
+	var legacy struct {
+		Sensors []struct {
+			ID         int   `json:"id"`
+			NightAlarm *bool `json:"night_alarm"`
+		} `json:"sensors"`
+	}
+	if json.Unmarshal(data, &legacy) != nil {
+		return
+	}
+	for _, l := range legacy.Sensors {
+		if l.NightAlarm == nil {
+			continue
+		}
+		for i := range cfg.Sensors {
+			if cfg.Sensors[i].ID == l.ID {
+				cfg.Sensors[i].NightAllowed = !*l.NightAlarm
+			}
+		}
+	}
 }
 
 // Save writes the current configuration to disk.

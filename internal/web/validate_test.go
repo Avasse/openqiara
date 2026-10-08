@@ -69,33 +69,6 @@ func TestValidateHomeKitPin(t *testing.T) {
 	}
 }
 
-// TestBuildSRTURL couvre le fix IPv6 : ni l'UI ni aucun test n'exerçait
-// handleOpenStream, donc la correction n'était validée par rien.
-func TestBuildSRTURL(t *testing.T) {
-	cases := []struct {
-		name string
-		host string
-		want string
-	}{
-		{"IPv4 avec port", "192.168.1.50:80", "srt://192.168.1.50:9000?passphrase=s3cr3t&mode=caller"},
-		{"IPv4 sans port", "192.168.1.50", "srt://192.168.1.50:9000?passphrase=s3cr3t&mode=caller"},
-		{"nom d'hôte", "openqiara.local:8080", "srt://openqiara.local:9000?passphrase=s3cr3t&mode=caller"},
-		// Sans SplitHostPort, un Index(":") tronquait à "[".
-		{"IPv6 avec port", "[::1]:80", "srt://[::1]:9000?passphrase=s3cr3t&mode=caller"},
-		// Sans re-bracketing, on produisait srt://::1:9000 — ambigu.
-		{"IPv6 sans port", "::1", "srt://[::1]:9000?passphrase=s3cr3t&mode=caller"},
-		{"IPv6 global", "[fd00::42]:80", "srt://[fd00::42]:9000?passphrase=s3cr3t&mode=caller"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got := buildSRTURL(tc.host, 9000, "s3cr3t"); got != tc.want {
-				t.Errorf("buildSRTURL(%q) = %q, want %q", tc.host, got, tc.want)
-			}
-		})
-	}
-}
-
 // TestHomeKitPinMasking : le setup code est un secret d'appairage (qui le lit
 // peut rattacher un contrôleur et piloter l'alarme), pas un champ de config
 // lisible. Il doit être masqué en lecture, et la valeur masquée renvoyée en

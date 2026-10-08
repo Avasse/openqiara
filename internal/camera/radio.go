@@ -108,7 +108,7 @@ func NewRadioClient(mcu radioMCU, store *config.Store, log *slog.Logger) *RadioC
 	}
 }
 
-// Connect takes the radio over: it fails while fbxhome runs, as fbxhome
+// Connect takes the radio over: it fails while another process (fbxhome)
 // holds the charmux ports.
 func (c *RadioClient) Connect(ctx context.Context) error {
 	if err := c.mcu.Connect(ctx); err != nil {
@@ -440,7 +440,7 @@ func isClosed(ch chan struct{}) bool {
 }
 
 // StartPairing waits for a sensor of sensorType in pairing mode.
-func (c *RadioClient) StartPairing(_ context.Context, sensorType, _ string) (int, error) {
+func (c *RadioClient) StartPairing(_ context.Context, sensorType string) (int, error) {
 	model, ok := NodeType[sensorType]
 	if !ok {
 		return 0, fmt.Errorf("radio: unknown sensor type %q", sensorType)
@@ -640,15 +640,10 @@ func (c *RadioClient) CachedSensors() []Sensor {
 	return out
 }
 
-// Sensors is CachedSensors: the sensors report, nothing is polled.
-func (c *RadioClient) Sensors(context.Context) ([]Sensor, error) {
-	return c.CachedSensors(), nil
-}
-
 // ReadSensor returns a sensor's live state. A door or motion sensor that
 // has not reported since the start has none: publishing the default
 // would overwrite the state Home Assistant kept.
-func (c *RadioClient) ReadSensor(_ context.Context, id int, _ string, _ []string) (*Sensor, error) {
+func (c *RadioClient) ReadSensor(_ context.Context, id int) (*Sensor, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	s, ok := c.sensors[id]
@@ -661,23 +656,6 @@ func (c *RadioClient) ReadSensor(_ context.Context, id int, _ string, _ []string
 	return &s, nil
 }
 
-var errFbxhomeOnly = errors.New("radio: fbxhome mode only")
-
-// EndpointsRead is fbxhome's API.
-func (c *RadioClient) EndpointsRead(context.Context, int, []string) ([]EndpointValue, error) {
-	return nil, errFbxhomeOnly
-}
-
-// EndpointsWrite is fbxhome's API.
-func (c *RadioClient) EndpointsWrite(context.Context, int, []EndpointWriteEntry) error {
-	return errFbxhomeOnly
-}
-
-// OpenStream is fbxhome's API.
-func (c *RadioClient) OpenStream(context.Context) (StreamInfo, error) {
-	return StreamInfo{}, errFbxhomeOnly
-}
-
 // SendPKT sends raw bytes to the MCU, outside the engine: debug only.
 func (c *RadioClient) SendPKT(ctx context.Context, data []byte) error {
 	return c.mcu.SendPKT(ctx, data)
@@ -685,8 +663,8 @@ func (c *RadioClient) SendPKT(ctx context.Context, data []byte) error {
 
 // Siren payloads, after the application class byte. 55 05 01 <power>
 // <duration> plays a sound the siren stops by itself, the duration in
-// quarter seconds (63 s at most), as fbxhome sends it (HlSrn::on_write
-// 0xab734, FbxhomeClient.TriggerSirenAlarm); 55 05 00 84 stops it. The
+// quarter seconds (63 s at most), as fbxhome sent it (HlSrn::on_write
+// 0xab734); 55 05 00 84 stops it. The
 // wake frame was found by ear in April 2026: fbxhome does not send it.
 var (
 	sirenWake = []byte{0x55, 0x0b, 0, 0, 0, 0, 0, 0}
@@ -704,7 +682,7 @@ func (c *RadioClient) TriggerSiren(ctx context.Context, id int) error {
 }
 
 // TriggerSirenAlarm starts the full-power wail, for duration (10 s if
-// unset, like fbxhome mode). It returns at once: the siren stops by
+// unset). It returns at once: the siren stops by
 // itself.
 func (c *RadioClient) TriggerSirenAlarm(ctx context.Context, id int, duration time.Duration) error {
 	if duration <= 0 {
@@ -788,6 +766,13 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 		return ctx.Err()
 	}
 }
+
+// Values of hlcamd's config.sensor.night_day_mode (the app's "night
+// vision" setting).
+const (
+	nightDayModeAuto     = 1
+	nightDayModeForceDay = 2 // IR-cut fixed, IR LED off
+)
 
 // SetShutter moves the privacy shutter through the MCU, and sets hlcamd's
 // IR-cut mode like fbxhome did for it (PR #41): forced day while closed,

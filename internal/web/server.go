@@ -68,25 +68,17 @@ type AlarmProvider interface {
 	SetTimings(arming, pending time.Duration)
 }
 
-// SensorListProvider returns the merged sensor list (MCU + persisted
-// config). When the MCU is temporarily unresponsive (e.g. just after a
-// reboot), the merged list still contains the sensors known to the
-// config so the UI doesn't show an empty page. Provided by main.go to
-// avoid creating a config↔camera package dependency cycle.
-type SensorListProvider func(ctx context.Context) ([]camera.Sensor, error)
-
 // Server serves the web UI and REST API for managing OpenQiara.
 type Server struct {
-	cam          camera.Client
-	store        *config.Store
-	mqttOK       func() bool
-	mqttCB       *MQTTCallbacks
-	sensorListFn SensorListProvider
-	startTime    time.Time
-	log          *slog.Logger
-	srv          *http.Server
-	staticFS     fs.FS
-	version      string // build info string ; empty = unknown
+	cam       camera.Client
+	store     *config.Store
+	mqttOK    func() bool
+	mqttCB    *MQTTCallbacks
+	startTime time.Time
+	log       *slog.Logger
+	srv       *http.Server
+	staticFS  fs.FS
+	version   string // build info string ; empty = unknown
 
 	alarmMu    sync.RWMutex
 	alarmState string // fallback when no alarm provider is attached
@@ -97,11 +89,6 @@ type Server struct {
 
 	hub      *sseHub
 	stopTick chan struct{}
-
-	// kpdPairMu protects kpdPairedAt and pendingKPDCode.
-	kpdPairMu      sync.Mutex
-	kpdPairedAt    time.Time
-	pendingKPDCode *pendingKPDCodeJob // si non nil, un job différé est en cours
 
 	// debugEnabled active les endpoints /api/debug/* (envoi PKT brut au MCU,
 	// séquences sirène arbitraires). Désactivé par défaut — ces endpoints
@@ -124,29 +111,9 @@ type Server struct {
 	otaInstaller *ota.Installer
 }
 
-// pendingKPDCodeJob représente une écriture de code PIN en attente que le
-// bytecode push post-pairing soit terminé.
-type pendingKPDCodeJob struct {
-	password string
-	label    string
-	cancel   chan struct{}
-}
-
-// SetSensorListProvider injects the merged sensor list provider. Should
-// be called once after NewServer, before Start. If never called, handlers
-// fall back to cam.Sensors() — which is what the existing tests rely on.
-func (s *Server) SetSensorListProvider(fn SensorListProvider) {
-	s.sensorListFn = fn
-}
-
-// listSensors returns the merged sensor list when a provider is set,
-// otherwise falls back to a direct MCU query. Centralised so all handlers
-// share the same source of truth.
-func (s *Server) listSensors(ctx context.Context) ([]camera.Sensor, error) {
-	if s.sensorListFn != nil {
-		return s.sensorListFn(ctx)
-	}
-	return s.cam.Sensors(ctx)
+// listSensors returns the paired sensors with their live state.
+func (s *Server) listSensors(context.Context) ([]camera.Sensor, error) {
+	return s.cam.CachedSensors(), nil
 }
 
 // SetAlarmProvider attaches the alarm engine to the web server.
@@ -298,8 +265,6 @@ func (s *Server) routes() (*http.ServeMux, error) {
 	mux.HandleFunc("PUT /api/v1/config/alarm", s.cors(s.handleUpdateAlarm))
 	mux.HandleFunc("GET /api/v1/config/web", s.cors(s.handleGetWeb))
 	mux.HandleFunc("PUT /api/v1/config/web", s.cors(s.handleUpdateWeb))
-	mux.HandleFunc("GET /api/v1/config/fbxhome_alarm", s.cors(s.handleGetFbxhomeAlarm))
-	mux.HandleFunc("PUT /api/v1/config/fbxhome_alarm", s.cors(s.handleUpdateFbxhomeAlarm))
 
 	// Ressources — état courant (lecture seule)
 	mux.HandleFunc("GET /api/v1/status", s.cors(s.handleStatus))
@@ -314,7 +279,6 @@ func (s *Server) routes() (*http.ServeMux, error) {
 	mux.HandleFunc("POST /api/v1/commands/siren/test", s.cors(s.handleSirenTest))
 	mux.HandleFunc("POST /api/v1/commands/siren/alarm_test", s.cors(s.handleSirenAlarmTest))
 	mux.HandleFunc("POST /api/v1/commands/stream/start", s.cors(s.handleStartStream))
-	mux.HandleFunc("POST /api/v1/commands/stream/open", s.cors(s.handleOpenStream))
 	mux.HandleFunc("POST /api/v1/commands/update/install", s.cors(s.handleUpdateInstall))
 	if s.debugEnabled {
 		mux.HandleFunc("POST /api/v1/commands/debug/pkt", s.cors(s.handleDebugPKT))
@@ -335,8 +299,8 @@ func (s *Server) routes() (*http.ServeMux, error) {
 	// Si on répond autre chose que 200, hl_event_collectd met les events
 	// en queue retry et ne pousse plus rien d'autre tant que la queue n'est
 	// pas vidée — il faut donc handler les DEUX routes en 200 OK.
-	mux.HandleFunc("POST /events", s.handleFbxhomePush)
-	mux.HandleFunc("POST /notifications", s.handleFbxhomePush)
+	mux.HandleFunc("POST /events", s.handleHLEventPush)
+	mux.HandleFunc("POST /notifications", s.handleHLEventPush)
 	// CORS preflight
 	mux.HandleFunc("OPTIONS /api/", s.handleOptions)
 
@@ -481,7 +445,7 @@ func (s *Server) basicAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Allow fbxhome push without auth — mais STRICTEMENT depuis loopback.
+		// Allow hl_event_collectd push without auth — mais STRICTEMENT depuis loopback.
 		// hl_event_collectd tourne sur la caméra elle-même et résout
 		// *.srv.home-labs.fr → 127.0.0.1 via dnsmasq local. Tout autre
 		// peer qui POST sur /events ou /notifications est suspect (LAN
@@ -551,49 +515,19 @@ func (s *Server) handleSensors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := s.store.Get()
-	type sensorCfg struct {
-		label        string
-		nightAllowed bool
-		dayAlarm     *bool
-		nightAlarm   *bool
-		dayTimed     *bool
-		nightTimed   *bool
-	}
-	cfgBySensor := make(map[int]sensorCfg, len(cfg.Sensors))
-	for _, se := range cfg.Sensors {
-		cfgBySensor[se.ID] = sensorCfg{
-			label:        se.Label,
-			nightAllowed: se.NightAllowed,
-			dayAlarm:     se.DayAlarm,
-			nightAlarm:   se.NightAlarm,
-			dayTimed:     se.DayTimed,
-			nightTimed:   se.NightTimed,
-		}
-	}
-
 	type sensorWithMeta struct {
 		camera.Sensor
 		Label        string `json:"label"`
 		NightAllowed bool   `json:"night_allowed"`
-		DayAlarm     *bool  `json:"day_alarm,omitempty"`
-		NightAlarm   *bool  `json:"night_alarm,omitempty"`
-		DayTimed     *bool  `json:"day_timed,omitempty"`
-		NightTimed   *bool  `json:"night_timed,omitempty"`
 	}
-	// Don't call ReadSensor per-sensor here: each one waits for the MCU
-	// (~3s timeout when the MCU is silent), so 5 sensors blocked the
-	// page for 15s and the frontend gave up. Live battery/temperature/
-	// state come through PKT events forwarded over SSE — the initial
-	// fetch only needs metadata (label, type, reachability).
+	entries := make(map[int]config.SensorEntry)
+	for _, se := range s.store.Get().Sensors {
+		entries[se.ID] = se
+	}
 	result := make([]sensorWithMeta, 0, len(sensors))
 	for _, sensor := range sensors {
-		sc := cfgBySensor[sensor.ID]
-		result = append(result, sensorWithMeta{
-			Sensor: sensor, Label: sc.label, NightAllowed: sc.nightAllowed,
-			DayAlarm: sc.dayAlarm, NightAlarm: sc.nightAlarm,
-			DayTimed: sc.dayTimed, NightTimed: sc.nightTimed,
-		})
+		se := entries[sensor.ID]
+		result = append(result, sensorWithMeta{Sensor: sensor, Label: se.Label, NightAllowed: se.NightAllowed})
 	}
 
 	writeJSON(w, http.StatusOK, result)
@@ -601,8 +535,7 @@ func (s *Server) handleSensors(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStartPairing(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Type        string `json:"type"`
-		Fingerprint string `json:"fingerprint"`
+		Type string `json:"type"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "JSON invalide")
@@ -613,32 +546,13 @@ func (s *Server) handleStartPairing(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "champ 'type' requis (DWS, PIR, SRN, KPD)")
 		return
 	}
-	fp := normalizeFingerprint(body.Fingerprint)
-
-	session, err := s.cam.StartPairing(r.Context(), body.Type, fp)
+	session, err := s.cam.StartPairing(r.Context(), body.Type)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "échec démarrage appairage: "+err.Error())
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"session": session})
-}
-
-// normalizeFingerprint sanitize l'input utilisateur d'un fingerprint QR :
-// supprime espaces et tirets (ex: "a4f4-d1ec-8ff1-376e" → "a4f4d1ec8ff1376e"),
-// passe en minuscules, et tronque aux 16 premiers chars hex.
-//
-// fbxhome attend exactement 16 chars hex (= 8 premiers octets du QR raw).
-// Les utilisateurs collent parfois la chaîne complète 32 chars ou avec des
-// tirets UUID-like ; on accepte les deux.
-func normalizeFingerprint(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.ReplaceAll(s, "-", "")
-	s = strings.ReplaceAll(s, " ", "")
-	if len(s) > 16 {
-		s = s[:16]
-	}
-	return s
 }
 
 func (s *Server) handlePollPairing(w http.ResponseWriter, r *http.Request) {
@@ -654,24 +568,8 @@ func (s *Server) handlePollPairing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The radio client saved the paired sensor in the config already.
 	if done && sensor != nil {
-		_ = s.store.Update(func(c *config.Config) {
-			for i := range c.Sensors {
-				if c.Sensors[i].ID == sensor.ID {
-					c.Sensors[i].Type = sensor.Type
-					return
-				}
-			}
-			c.Sensors = append(c.Sensors, config.SensorEntry{ID: sensor.ID, Type: sensor.Type})
-		})
-		// Marque le timestamp pour le KPD — son cycle bytecode post-pair
-		// prend ~10s ; les écritures de code PIN doivent attendre pour ne pas
-		// le corrompre. Cf. handleSetKPDCode.
-		if sensor.Type == "KPD" {
-			s.kpdPairMu.Lock()
-			s.kpdPairedAt = time.Now()
-			s.kpdPairMu.Unlock()
-		}
 		if s.mqttCB != nil && s.mqttCB.OnSensorsChanged != nil {
 			s.mqttCB.OnSensorsChanged(r.Context())
 		}
@@ -768,10 +666,6 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Label        *string `json:"label,omitempty"`
 		NightAllowed *bool   `json:"night_allowed,omitempty"`
-		DayAlarm     *bool   `json:"day_alarm,omitempty"`
-		NightAlarm   *bool   `json:"night_alarm,omitempty"`
-		DayTimed     *bool   `json:"day_timed,omitempty"`
-		NightTimed   *bool   `json:"night_timed,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "JSON invalide")
@@ -781,8 +675,7 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 		trimmed := strings.TrimSpace(*body.Label)
 		body.Label = &trimmed
 	}
-	if body.Label == nil && body.NightAllowed == nil && body.DayAlarm == nil &&
-		body.NightAlarm == nil && body.DayTimed == nil && body.NightTimed == nil {
+	if body.Label == nil && body.NightAllowed == nil {
 		writeErr(w, http.StatusBadRequest, "au moins un champ requis")
 		return
 	}
@@ -793,18 +686,6 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.NightAllowed != nil {
 			e.NightAllowed = *body.NightAllowed
-		}
-		if body.DayAlarm != nil {
-			e.DayAlarm = body.DayAlarm
-		}
-		if body.NightAlarm != nil {
-			e.NightAlarm = body.NightAlarm
-		}
-		if body.DayTimed != nil {
-			e.DayTimed = body.DayTimed
-		}
-		if body.NightTimed != nil {
-			e.NightTimed = body.NightTimed
 		}
 	}
 
@@ -821,32 +702,6 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		writeErr(w, http.StatusInternalServerError, "échec sauvegarde: "+err.Error())
 		return
-	}
-
-	// Push fbxhome ExportLink flags via endpoints_write for fields that changed.
-	// charmux backend doesn't expose ExportLinks — flags stay in our config
-	// only and are honoured by the local alarm engine.
-	if _, isFbx := s.cam.(*camera.FbxhomeClient); isFbx {
-		type epWrite struct {
-			name string
-			val  *bool
-		}
-		for _, ep := range []epWrite{
-			{"day_alarm", body.DayAlarm},
-			{"night_alarm", body.NightAlarm},
-			{"day_timed", body.DayTimed},
-			{"night_timed", body.NightTimed},
-		} {
-			if ep.val == nil {
-				continue
-			}
-			err := s.cam.EndpointsWrite(r.Context(), id, []camera.EndpointWriteEntry{
-				{EPName: ep.name, Value: *ep.val},
-			})
-			if err != nil {
-				s.log.Warn("sensor flag push failed", "sensor", id, "ep", ep.name, "error", err)
-			}
-		}
 	}
 
 	// Re-publish MQTT discovery with new name (only if label was updated).
@@ -870,22 +725,6 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *Server) handleOpenStream(w http.ResponseWriter, r *http.Request) {
-	info, err := s.cam.OpenStream(r.Context())
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "échec ouverture flux: "+err.Error())
-		return
-	}
-
-	srtURL := buildSRTURL(r.Host, info.Port, info.Passphrase)
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"srt_url":    srtURL,
-		"passphrase": info.Passphrase,
-		"port":       info.Port,
-	})
-}
-
 // maskedSecret remplace tout secret renvoyé en lecture. Le handler d'écriture
 // le reconnaît et laisse alors la valeur stockée intacte, ce qui permet à
 // l'UI de renvoyer la config telle qu'elle l'a reçue sans effacer le mot de
@@ -898,24 +737,15 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	if masked.Password != "" {
 		masked.Password = maskedSecret
 	}
-	// camera_mode lets the UI know whether to expose openqiarad-only
-	// timings (charmux mode) or hide them because fbxhome owns them.
-	cameraMode := "fbxhome"
-	if _, ok := s.cam.(*camera.RadioClient); ok {
-		cameraMode = "charmux"
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"mqtt":        masked,
-		"homekit":     maskHomeKit(cfg.HomeKit),
-		"admin":       map[string]any{"password_set": cfg.Admin.AuthEnabled()},
-		"web":         map[string]any{"enabled": cfg.WebEnabled()},
-		"camera_mode": cameraMode,
-		"alarm":       s.alarmConfigPayload(),
+		"mqtt":    masked,
+		"homekit": maskHomeKit(cfg.HomeKit),
+		"admin":   map[string]any{"password_set": cfg.Admin.AuthEnabled()},
+		"web":     map[string]any{"enabled": cfg.WebEnabled()},
+		"alarm":   s.alarmConfigPayload(),
 	})
 }
 
-// handleGetFbxhomeAlarm reads the persisted HlAlarm timings from the
-// rotated fbxhome.xml.N files (endpoints_read is ACL-blocked).
 // handleNotFoundV1 répond aux routes /api/v1/* qui n'existent pas dans cette
 // version : faute de frappe, méthode non supportée, ou route pas encore
 // déployée. 404 et non 410 — la ressource n'a pas disparu, elle n'a jamais
@@ -998,39 +828,6 @@ func (s *Server) alarmConfigPayload() map[string]any {
 		"pending_delay_seconds": int(cfg.PendingDelay().Seconds()),
 		"wail_duration_seconds": int(cfg.WailDuration().Seconds()),
 	}
-}
-
-func (s *Server) handleGetFbxhomeAlarm(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.cam.(*camera.FbxhomeClient); !ok {
-		writeErr(w, http.StatusBadRequest, "indisponible en mode charmux")
-		return
-	}
-	t, err := camera.ReadAlarmTimings()
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "lecture XML fbxhome: "+err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, t)
-}
-
-// handleUpdateFbxhomeAlarm pushes new HlAlarm timings via endpoints_write
-// on node 2. Only fields > 0 are written.
-func (s *Server) handleUpdateFbxhomeAlarm(w http.ResponseWriter, r *http.Request) {
-	fbx, ok := s.cam.(*camera.FbxhomeClient)
-	if !ok {
-		writeErr(w, http.StatusBadRequest, "indisponible en mode charmux")
-		return
-	}
-	var body camera.AlarmTimings
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeErr(w, http.StatusBadRequest, "JSON invalide")
-		return
-	}
-	if err := fbx.WriteAlarmTimings(r.Context(), body); err != nil {
-		writeErr(w, http.StatusInternalServerError, "écriture fbxhome: "+err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *Server) handleUpdateAlarm(w http.ResponseWriter, r *http.Request) {
@@ -1270,25 +1067,6 @@ func (s *Server) handleUpdateHomeKit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-}
-
-// buildSRTURL construit l'URL SRT annoncée au client à partir du Host de la
-// requête. Deux pièges :
-//
-//   - un Index(":") pour retirer le port tronque `[::1]:80` à `[` ;
-//     SplitHostPort rend bien `::1`. Un Host sans port n'est pas une erreur,
-//     on le garde tel quel.
-//   - une adresse IPv6 doit être re-bracketée, sinon `srt://::1:9000` est
-//     ambigu (impossible de distinguer l'adresse du port).
-func buildSRTURL(reqHost string, port int, passphrase string) string {
-	host := reqHost
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	if strings.Contains(host, ":") {
-		host = "[" + host + "]"
-	}
-	return fmt.Sprintf("srt://%s:%d?passphrase=%s&mode=caller", host, port, passphrase)
 }
 
 // --- Validation helpers ---
@@ -1554,7 +1332,7 @@ func (s *Server) handleSetKPDCode(w http.ResponseWriter, r *http.Request) {
 		body.Label = "Code"
 	}
 
-	idx, kpd, err := s.requireSingleKPD()
+	idx, _, err := s.requireSingleKPD()
 	if err != nil {
 		writeKPDErr(w, err)
 		return
@@ -1572,81 +1350,13 @@ func (s *Server) handleSetKPDCode(w http.ResponseWriter, r *http.Request) {
 	if rc, ok := s.cam.(*camera.RadioClient); ok {
 		rc.Reload()
 	}
-	// In fbxhome mode : push le code via endpoints_write pwd. Si le KPD vient
-	// d'être pairé (< 30s), on diffère l'écriture : fbxhome est encore en
-	// cours de push bytecode/config, et écrire le code maintenant interromp
-	// le cycle radio (KPD se retrouve en boucle f10001 vert post-pair sans
-	// jamais finaliser sa config — bug observé 2026-05-14).
-	if fc, ok := s.cam.(*camera.FbxhomeClient); ok {
-		s.scheduleKPDCodeWrite(fc, kpd.ID, body.Password, body.Label)
-	}
 
 	s.log.Info("KPD code updated", "label", body.Label)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// kpdCodePostPairDelay est la fenêtre minimale entre un pairing KPD réussi
-// et la première écriture de code PIN. Pendant ce temps fbxhome push le
-// bytecode et la config initiale au KPD ; écrire le code trop tôt
-// désynchronise le pairing crypto.
-const kpdCodePostPairDelay = 30 * time.Second
-
-// scheduleKPDCodeWrite écrit le code PIN immédiatement si on est hors fenêtre
-// post-pair, sinon diffère en background. Tout job pendant en cours est
-// annulé pour ne garder que la dernière valeur souhaitée.
-func (s *Server) scheduleKPDCodeWrite(fc *camera.FbxhomeClient, kpdID int, password, label string) {
-	s.kpdPairMu.Lock()
-	pairedAt := s.kpdPairedAt
-	// Cancel previous pending job to avoid double-write.
-	if s.pendingKPDCode != nil {
-		close(s.pendingKPDCode.cancel)
-		s.pendingKPDCode = nil
-	}
-	s.kpdPairMu.Unlock()
-
-	wait := time.Until(pairedAt.Add(kpdCodePostPairDelay))
-	if wait <= 0 {
-		// Hors fenêtre post-pair : écriture immédiate.
-		if err := fc.SetKPDPassword(context.Background(), kpdID, password, label); err != nil {
-			s.log.Warn("fbxhome SetKPDPassword failed", "error", err)
-		}
-		return
-	}
-
-	// Différer en background. L'API retourne OK avant ce délai.
-	job := &pendingKPDCodeJob{password: password, label: label, cancel: make(chan struct{})}
-	s.kpdPairMu.Lock()
-	s.pendingKPDCode = job
-	s.kpdPairMu.Unlock()
-
-	s.log.Info("KPD code write deferred (post-pair bytecode cycle in progress)",
-		"wait", wait.Round(time.Second), "kpd_id", kpdID)
-
-	go func() {
-		select {
-		case <-time.After(wait):
-			s.kpdPairMu.Lock()
-			current := s.pendingKPDCode
-			if current == job {
-				s.pendingKPDCode = nil
-			}
-			s.kpdPairMu.Unlock()
-			if current != job {
-				return // job remplacé par une nouvelle écriture, abandonner.
-			}
-			if err := fc.SetKPDPassword(context.Background(), kpdID, password, label); err != nil {
-				s.log.Warn("fbxhome SetKPDPassword (deferred) failed", "error", err)
-				return
-			}
-			s.log.Info("KPD code written (deferred)", "label", label, "kpd_id", kpdID)
-		case <-job.cancel:
-			// Annulé par un nouvel appel scheduleKPDCodeWrite.
-		}
-	}()
-}
-
 func (s *Server) handleDeleteKPDCode(w http.ResponseWriter, r *http.Request) {
-	idx, kpd, err := s.requireSingleKPD()
+	idx, _, err := s.requireSingleKPD()
 	if err != nil {
 		writeKPDErr(w, err)
 		return
@@ -1662,11 +1372,6 @@ func (s *Server) handleDeleteKPDCode(w http.ResponseWriter, r *http.Request) {
 
 	if rc, ok := s.cam.(*camera.RadioClient); ok {
 		rc.Reload()
-	}
-	if fc, ok := s.cam.(*camera.FbxhomeClient); ok {
-		if err := fc.ClearKPDPassword(r.Context(), kpd.ID); err != nil {
-			s.log.Warn("fbxhome ClearKPDPassword failed", "error", err)
-		}
 	}
 
 	s.log.Info("KPD code deleted")
@@ -1784,8 +1489,7 @@ func (s *Server) handleSirenTest(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSirenAlarmTest déclenche le wail d'alarme intrusion sur la
-// première sirène appairée. En mode fbxhome la durée est gérée côté
-// firmware ; en mode charmux on respecte WailDuration de la config.
+// première sirène appairée, pour la durée WailDuration de la config.
 func (s *Server) handleSirenAlarmTest(w http.ResponseWriter, r *http.Request) {
 	sensors, err := s.listSensors(r.Context())
 	if err != nil {
@@ -1913,11 +1617,11 @@ func (s *Server) handleDebugSirenSeq(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// maxFbxhomePushBody protège contre un client malveillant qui enverrait un
+// maxHLEventPushBody protège contre un client malveillant qui enverrait un
 // body énorme. 64 KiB suffit largement pour la JSON de notifications.
-const maxFbxhomePushBody = 64 << 10
+const maxHLEventPushBody = 64 << 10
 
-// handleFbxhomePush reçoit les events push de hl_event_collectd qui pense
+// handleHLEventPush reçoit les events push de hl_event_collectd qui pense
 // envoyer au cloud Free. La réponse mime celle du cloud ({"result":"ok"})
 // pour qu'il considère la livraison comme réussie et ne retry pas.
 //
@@ -1934,16 +1638,16 @@ const maxFbxhomePushBody = 64 << 10
 // CRITIQUE : doit répondre 200 sur les DEUX routes, sinon hl_event_collectd
 // met sa queue en retry et ne flush plus rien — on aurait des events qui
 // sortent au compte-gouttes.
-func (s *Server) handleFbxhomePush(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHLEventPush(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = r.Body.Close() }()
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxFbxhomePushBody))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxHLEventPushBody))
 	if err != nil {
-		s.log.Warn("fbxhome push: read body failed", "err", err)
+		s.log.Warn("hl_event push: read body failed", "err", err)
 		// On répond OK quand même pour ne pas faire retry l'expéditeur — le
 		// body partiel est dans `body`, ce qui est mieux que rien.
 	}
 
-	s.log.Info("fbxhome push received",
+	s.log.Info("hl_event push received",
 		"host", r.Host,
 		"path", r.URL.Path,
 		"content_type", r.Header.Get("Content-Type"),
@@ -1973,7 +1677,7 @@ func (s *Server) handleFbxhomePush(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Server", "nginx/1.14.2")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(`{"result":"ok"}`)); err != nil {
-		s.log.Debug("fbxhome push: response write failed", "err", err)
+		s.log.Debug("hl_event push: response write failed", "err", err)
 	}
 }
 

@@ -95,11 +95,9 @@ func TestNoTransitionSkipsAll(t *testing.T) {
 	}
 }
 
-// TestArmingNoBeepInFbxhomeMode : "arming" en mode fbxhome (pas charmux) →
-// pas de beep. L'API vendor n'expose qu'un wail (test=true) qui ferait du
-// bruit pendant ~1s avant qu'un reboot_srn ultérieur ne le coupe, ce qui
-// n'a pas le bon UX (cf. siren_controller.go).
-func TestArmingNoBeepInFbxhomeMode(t *testing.T) {
+// TestArmingNoBeep : "arming" ne fait aucun son. Les bips d'armement
+// font passer la sirène par ses propres états (cf. siren_controller.go).
+func TestArmingNoBeep(t *testing.T) {
 	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
 	sc, _ := newTestController(t, cam, "all")
 	sc.sirenReady = true
@@ -107,7 +105,7 @@ func TestArmingNoBeepInFbxhomeMode(t *testing.T) {
 	sc.Handle("arming", "disarmed")
 
 	if len(cam.triggerSirenCalls) != 0 {
-		t.Errorf("fbxhome mode should not produce arming beep, got %v", cam.triggerSirenCalls)
+		t.Errorf("arming should not beep, got %v", cam.triggerSirenCalls)
 	}
 	if len(cam.triggerSirenAlarmCalls) != 0 {
 		t.Errorf("unexpected TriggerSirenAlarm calls: %v", cam.triggerSirenAlarmCalls)
@@ -172,11 +170,9 @@ func TestDisarmedStopsSiren(t *testing.T) {
 	if len(cam.stopSirenCalls) != 1 || cam.stopSirenCalls[0] != 32 {
 		t.Errorf("expected StopSiren(32), got %v", cam.stopSirenCalls)
 	}
-	// En mode fbxhome (pas charmux), pas de disarm beep — voir
-	// TestArmingNoBeepInFbxhomeMode pour la justification (wail vendor
-	// 1s mal compris comme "beep").
+	// Pas de bip de désarmement, cf. TestArmingNoBeep.
 	if len(cam.triggerSirenCalls) != 0 {
-		t.Errorf("fbxhome mode should not produce disarm beep, got %d calls", len(cam.triggerSirenCalls))
+		t.Errorf("disarm should not beep, got %d calls", len(cam.triggerSirenCalls))
 	}
 }
 

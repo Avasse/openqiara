@@ -22,8 +22,8 @@ import "time"
 //
 //   - shutter_open / shutter_close (caméra : volet objectif)
 //   - day_alarm_delay_on / alarm_on / alarm_trigged / alarm_day_off /
-//     alarm_night_off (transitions alarme — déjà capturées par le tail
-//     fbxhome.log mais on les reçoit aussi ici)
+//     alarm_night_off (transitions de l'alarme interne de fbxhome :
+//     n'arrivent plus sans lui)
 //   - dws_open / dws_close (porte/fenêtre)
 //   - false_alert, timeout_alert, timeout_before_alert
 //   - pkt_lost

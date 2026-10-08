@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -190,5 +191,37 @@ func TestFailedUpdateChangesNothing(t *testing.T) {
 	reread := NewStore(path)
 	if err := reread.Load(); err != nil || len(reread.Get().DeletedIDs) != 1 || reread.Get().DeletedIDs[0] != 7 {
 		t.Errorf("file holds %v (%v), want [7]", reread.Get().DeletedIDs, err)
+	}
+}
+
+// TestMigrateNightAlarm: fbxhome's night_alarm flag, which overrode
+// night_allowed, becomes its opposite night_allowed; the other fbxhome
+// flags are dropped.
+func TestMigrateNightAlarm(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	old := `{"sensors": [
+		{"id": 17, "type": "PIR", "night_alarm": false, "day_alarm": true},
+		{"id": 23, "type": "DWS", "night_allowed": true, "night_alarm": true},
+		{"id": 29, "type": "SRN", "night_allowed": true}
+	]}`
+	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := NewStore(path)
+	if err := s.Load(); err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]bool{17: true, 23: false, 29: true}
+	for _, se := range s.Get().Sensors {
+		if se.NightAllowed != want[se.ID] {
+			t.Errorf("sensor %d: night_allowed = %v, want %v", se.ID, se.NightAllowed, want[se.ID])
+		}
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := os.ReadFile(path)
+	if strings.Contains(string(saved), "night_alarm") || strings.Contains(string(saved), "day_alarm") {
+		t.Errorf("fbxhome flags still saved:\n%s", saved)
 	}
 }

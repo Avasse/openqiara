@@ -70,8 +70,7 @@ func (d *Dispatcher) HandleNotification(_ context.Context, item NotificationItem
 }
 
 // HandleEvent traite un event /events. Pour l'instant on ne fait que
-// logger — les events sensor/alarm sont déjà capturés par d'autres voies
-// (fbxhomelog tail). À étendre si on veut consommer shutter_open/close
+// logger — les events sensor viennent du moteur radio. À étendre si on veut consommer shutter_open/close
 // d'ici plutôt qu'ailleurs.
 func (d *Dispatcher) HandleEvent(_ context.Context, item EventItem) {
 	d.logger.Debug("hlevents: /events item",

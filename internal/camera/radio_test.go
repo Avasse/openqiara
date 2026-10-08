@@ -144,14 +144,14 @@ func TestRadioEvents(t *testing.T) {
 	siren := srn
 	siren.Battery = 76 // last level saved: no 0 published before its heartbeat
 	c, mcu, store := newRadio(t, kpd, dws, siren)
-	if s, _ := c.ReadSensor(context.Background(), 29, "SRN", nil); s == nil || s.Battery != 76 {
+	if s, _ := c.ReadSensor(context.Background(), 29); s == nil || s.Battery != 76 {
 		t.Errorf("siren at start = %+v, want its saved battery", s)
 	}
 	if f := mcu.sent(t); f.Route != 6 || !bytes.Equal(f.Payload, []byte{0x55, 0x06}) {
 		t.Fatalf("first frame = %+v, want the siren asked for its state", f)
 	}
 
-	if _, err := c.ReadSensor(context.Background(), 23, "DWS", nil); err == nil {
+	if _, err := c.ReadSensor(context.Background(), 23); err == nil {
 		t.Error("door state read before the door reported it")
 	}
 	mcu.rx(state(5, 10, 0)) // door opened
@@ -161,7 +161,7 @@ func TestRadioEvents(t *testing.T) {
 	if ack := mcu.sent(t); ack.GWDst != 5 || ack.AckCnt != 10 || ack.Flags != 0x0084 {
 		t.Errorf("ack = %+v, want fbxhome's DWS ack", ack)
 	}
-	if s, err := c.ReadSensor(context.Background(), 23, "DWS", nil); err != nil || !s.Open {
+	if s, err := c.ReadSensor(context.Background(), 23); err != nil || !s.Open {
 		t.Errorf("read %+v %v, want open", s, err)
 	}
 	// Opened again (its close was lost): it must go out again.
@@ -262,7 +262,7 @@ func TestRadioPairing(t *testing.T) {
 	uid := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 	pair := func(addr byte) *Sensor {
 		t.Helper()
-		if _, err := c.StartPairing(context.Background(), "PIR", ""); err != nil {
+		if _, err := c.StartPairing(context.Background(), "PIR"); err != nil {
 			t.Fatal(err)
 		}
 		mcu.ctrlRx(append(append(append([]byte{0x17}, testKey[:6]...), uid...), "HOMELABPIR00ACFD"...)...)
@@ -426,7 +426,7 @@ func TestRadioPairingLimit(t *testing.T) {
 	c, mcu, _ := newRadio(t, srn)
 	mcu.sent(t)
 	for i := range maxFailedPairings {
-		if _, err := c.StartPairing(context.Background(), "PIR", ""); err != nil {
+		if _, err := c.StartPairing(context.Background(), "PIR"); err != nil {
 			t.Fatalf("attempt %d refused: %v", i+1, err)
 		}
 		if err := c.StopPairing(context.Background(), 1); err != nil {
@@ -440,7 +440,7 @@ func TestRadioPairingLimit(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 	}
-	if _, err := c.StartPairing(context.Background(), "PIR", ""); err == nil {
+	if _, err := c.StartPairing(context.Background(), "PIR"); err == nil {
 		t.Fatal("pairing allowed after too many failures")
 	}
 }
