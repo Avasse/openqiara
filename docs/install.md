@@ -54,7 +54,8 @@ dropbearkey -t ed25519 -f /tmp/dropbear/dropbear_ed25519_host_key 2>/dev/null
 dropbearkey -t rsa -s 2048 -f /tmp/dropbear/dropbear_rsa_host_key 2>/dev/null
 
 # === openqiara ===
-(sleep 45; /data/openqiarad -web :80 -log /data/openqiarad.log >/dev/null 2>&1) &
+# openqiarad is the radio gateway: fbxhome must let go of the radio first.
+(sleep 45; fbxupstartctl stop fbxhome; killall fbxhome; sleep 2; /data/openqiarad -web :80 -log /data/openqiarad.log >/dev/null 2>&1) &
 EOF
 
 sed -i "/^step \"done\"/r /tmp/rcS_additions" /etc/init.d/rcS.real

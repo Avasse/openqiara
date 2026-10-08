@@ -22,7 +22,6 @@ const (
 
 type Option func(*Client)
 
-func WithHost(host string) Option            { return func(c *Client) { c.host = host } }
 func WithReadTimeout(d time.Duration) Option { return func(c *Client) { c.readTimeout = d } }
 func WithLogger(l *slog.Logger) Option       { return func(c *Client) { c.log = l } }
 

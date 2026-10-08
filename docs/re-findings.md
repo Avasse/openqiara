@@ -1,9 +1,10 @@
 # Reverse Engineering — Findings & Open Questions
 
 This document consolidates everything learned about `fbxhome` (the vendor
-daemon) by static analysis of the ARM ELF binary using Ghidra Headless. It
-covers the bits that drive `openqiarad`'s charmux mode and explicitly
-calls out what's still **unknown** so future work has a starting point.
+daemon) by static analysis of the ARM ELF binary using Ghidra Headless.
+It is a **historical** research log: fbxhome no longer runs, openqiarad is
+the radio gateway (`internal/radio`), and parts of this file predate that.
+Where they disagree, the code and `docs/protocol.md` win.
 
 > See `docs/protocol.md` for the user-facing protocol reference. This file
 > is the **research log** behind it.
