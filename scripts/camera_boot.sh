@@ -177,6 +177,14 @@ fbxupstartctl stop hls-360p 2>/dev/null
 fbxupstartctl stop hls-1080p 2>/dev/null
 fbxupstartctl stop hlcamd 2>/dev/null
 killall hls hlcamd 2>/dev/null
+# hlcamd started too soon after the previous one is killed dies at init
+# (MI_VIF_SetDevAttr FAILED a0062082) and leaves the video input stuck
+# until the next reboot. Wait until the old instances are really gone.
+for i in $(seq 1 15); do
+    pidof hlcamd >/dev/null || pidof hls >/dev/null || break
+    sleep 1
+done
+sleep 2
 EUPID=$(cat /tmp/key.eupid 2>/dev/null || echo "")
 MAC=$(cat /sys/class/net/ssv0/address 2>/dev/null || echo "")
 if [ -n "$EUPID" ] && [ -n "$MAC" ]; then
