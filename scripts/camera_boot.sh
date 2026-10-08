@@ -229,7 +229,17 @@ fi
 # -log active la rotation interne lumberjack (1 MB par fichier, 3 backups
 # = ~4 MB max). Le watchdog ci-dessous reste comme filet de sécurité au
 # cas où lumberjack se planterait (cap dur à 4 MB par fichier).
-/data/openqiarad -web :80 -log /data/openqiarad.log >/dev/null 2>&1 &
+#
+# Restarted when it exits: it is the radio gateway, nothing else serves the
+# sensors. It exits when the radio is not free yet (fbxhome still letting
+# go of it) or on a crash; to deploy, replace the binary and kill it.
+(
+    while :; do
+        /data/openqiarad -web :80 -log /data/openqiarad.log >/dev/null 2>&1
+        echo "[boot] openqiarad exited ($?) at $(date -Iseconds), restarting" >> /data/openqiarad.log
+        sleep 10
+    done
+) &
 
 # Stop the vendor watchdog from rebooting the camera every ~12 h 06.
 # watchdog_mcu keeps the MCU's 15-minute hardware watchdog fed only while
@@ -250,13 +260,13 @@ fi
 (sleep 10; fbxbusctl call hlcamd resume_streams 2>/dev/null) &
 
 # Watchdog: hlsystem can respawn and relaunch hls-720p/360p/1080p in H.265,
-# which conflicts with our H.264 pipeline. Poll every 30s and kill any
-# stock hls service that came back up. Same loop also enforces a hard
+# which conflicts with our H.264 pipeline, and fbxhome would take the radio
+# back. Poll every 30s and stop any stock service that came back up. Same loop also enforces a hard
 # log-size cap (4M) so /data never fills up between reboots.
 (
     while :; do
         sleep 30
-        for svc in hlsystem hls-720p hls-360p hls-1080p; do
+        for svc in hlsystem hls-720p hls-360p hls-1080p fbxhome; do
             if fbxupstartctl status "$svc" 2>/dev/null | grep -qE 'start(ed|ing)'; then
                 fbxupstartctl stop "$svc" 2>/dev/null
                 echo "[watchdog] stopped $svc at $(date -Iseconds)" >> /data/openqiarad.log
