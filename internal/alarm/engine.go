@@ -62,6 +62,9 @@ type SensorConfig struct {
 	// (motion is allowed). All sensors trigger in armed_away regardless.
 	// Default is false: the sensor is strict (triggers in both modes).
 	NightAllowed bool
+	// Instant: the sensor fires the siren at once, with no entry delay
+	// (a window: nobody comes in through it). Default false: delayed.
+	Instant bool
 }
 
 // ConfigProvider returns per-sensor configuration at runtime.
@@ -317,10 +320,20 @@ func (e *Engine) HandleSensorEvent(sensorID int, sensorType string, inAlarm bool
 		return
 	}
 
-	// Trigger: transition to pending (60s grace before siren).
 	e.trigBy = sensorID
-	e.logger.Info("alarm: sensor triggered", "sensor_id", sensorID, "type", sensorType, "state", e.state)
-	e.startPending()
+	e.logger.Info("alarm: sensor triggered", "sensor_id", sensorID, "type", sensorType, "state", e.state, "instant", cfg.Instant)
+	e.startAlarmLocked(cfg)
+}
+
+// startAlarmLocked fires the siren for a sensor in alarm: after the entry
+// delay (pending), or at once for an instant sensor.
+func (e *Engine) startAlarmLocked(cfg SensorConfig) {
+	if !cfg.Instant {
+		e.startPending()
+		return
+	}
+	e.prevState = e.state // the armed state, restored after the siren
+	e.transitionLocked(StateTriggered, "instant sensor")
 }
 
 // --- private helpers (all called with e.mu held) ---
@@ -352,7 +365,7 @@ func (e *Engine) triggerIfSensorInAlarmLocked() {
 		}
 		e.trigBy = sensorID
 		e.logger.Info("alarm: sensor still in alarm post-arm", "sensor_id", sensorID, "state", e.state)
-		e.startPending()
+		e.startAlarmLocked(cfg)
 		return
 	}
 }

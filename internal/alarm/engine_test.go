@@ -227,6 +227,25 @@ func TestNightAllowedSensorStillTriggersInAway(t *testing.T) {
 	}
 }
 
+// TestInstantSensorSkipsEntryDelay: an instant sensor fires the siren at
+// once, and the siren's end brings the alarm back to armed.
+func TestInstantSensorSkipsEntryDelay(t *testing.T) {
+	e := newTestEngine(t, map[int]SensorConfig{4: {Instant: true}})
+	e.HandleCommand("arm_away", SourceRemote)
+	e.HandleSensorEvent(4, "DWS", true)
+	snap := e.Snapshot()
+	if snap.State != StateTriggered || snap.TriggeredBy != 4 || snap.PreviousState != StateArmedAway {
+		t.Fatalf("snapshot = %+v, want triggered by 4 from armed_away", snap)
+	}
+	e.mu.Lock()
+	e.timerDeadline = time.Now().Add(-time.Second)
+	e.mu.Unlock()
+	e.tick()
+	if s := e.Snapshot().State; s != StateArmedAway {
+		t.Errorf("after the siren: %q, want armed_away", s)
+	}
+}
+
 func TestKPDEventNeverTriggers(t *testing.T) {
 	e := newTestEngine(t, nil)
 	e.HandleCommand("arm_away", SourceLocal)

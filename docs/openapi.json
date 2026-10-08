@@ -145,7 +145,8 @@
                         "kpd_state": "disarmed",
                         "last_seen": 1758441600,
                         "label": "Entrée",
-                        "night_allowed": false
+                        "night_allowed": false,
+                        "instant": false
                       },
                       {
                         "id": 23,
@@ -158,7 +159,8 @@
                         "motion": false,
                         "last_seen": 1758441500,
                         "label": "Porte d'entrée",
-                        "night_allowed": false
+                        "night_allowed": false,
+                        "instant": false
                       }
                     ]
                   }
@@ -2214,7 +2216,8 @@
             "type": "object",
             "required": [
               "label",
-              "night_allowed"
+              "night_allowed",
+              "instant"
             ],
             "properties": {
               "label": {
@@ -2224,6 +2227,10 @@
               "night_allowed": {
                 "type": "boolean",
                 "description": "Capteur ignoré en mode nuit (typiquement un PIR dans une chambre)."
+              },
+              "instant": {
+                "type": "boolean",
+                "description": "Déclenche la sirène sans délai d'entrée (typiquement une fenêtre)."
               }
             }
           }
@@ -2852,6 +2859,10 @@
           "night_allowed": {
             "type": "boolean",
             "description": "Ignorer ce capteur en mode nuit."
+          },
+          "instant": {
+            "type": "boolean",
+            "description": "Déclencher la sirène sans délai d'entrée."
           }
         }
       },

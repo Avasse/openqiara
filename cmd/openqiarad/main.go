@@ -443,11 +443,12 @@ func main() {
 	// Alarm engine — standalone state machine for arm/disarm/triggered logic.
 	// Config provider reads night_mode from the config store on each query.
 	// alarmConfigFor mappe la config sensor vers le format attendu par
-	// l'engine : NightAllowed = capteur ignoré en mode nuit.
+	// l'engine : NightAllowed = capteur ignoré en mode nuit, Instant = pas
+	// de délai d'entrée.
 	alarmConfigFor := func(sensorID int) alarm.SensorConfig {
 		for _, se := range store.Get().Sensors {
 			if se.ID == sensorID {
-				return alarm.SensorConfig{NightAllowed: se.NightAllowed}
+				return alarm.SensorConfig{NightAllowed: se.NightAllowed, Instant: se.Instant}
 			}
 		}
 		return alarm.SensorConfig{}

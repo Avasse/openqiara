@@ -637,11 +637,15 @@ async function fetchAlarm() {
 }
 
 async function setNightAllowed(id, allowed) {
+  return setSensorFlag(id, {night_allowed: allowed});
+}
+
+async function setSensorFlag(id, flag) {
   try {
     const r = await fetch(V1 + '/sensors/' + id, {
       method: 'PUT',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({night_allowed: allowed})
+      body: JSON.stringify(flag)
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
@@ -1182,6 +1186,10 @@ function renderSensors(sensors) {
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Si coché, ce capteur ne déclenche pas l'alarme en mode Nuit">
                 <input type="checkbox" ${nightChecked} onchange="setNightAllowed(${s.id}, this.checked)">
                 <span>🌙 Autoriser en mode nuit</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Si coché, ce capteur déclenche la sirène sans délai d'entrée (une fenêtre, par exemple)">
+                <input type="checkbox" ${s.instant ? 'checked' : ''} onchange="setSensorFlag(${s.id}, {instant: this.checked})">
+                <span>⚡ Instantané</span>
               </label>
             </div>` : ''}
           </div>

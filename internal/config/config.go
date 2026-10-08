@@ -271,6 +271,7 @@ type SensorEntry struct {
 	KPDCode      string `json:"kpd_code,omitempty"`
 	KPDCodeLabel string `json:"kpd_code_label,omitempty"`
 	NightAllowed bool   `json:"night_allowed,omitempty"` // ignored by the alarm when armed for the night
+	Instant      bool   `json:"instant,omitempty"`       // fires the siren with no entry delay
 
 	// Radio is where the sensor sits on the radio network: set at
 	// pairing, imported from fbxhome.xml at the first start.

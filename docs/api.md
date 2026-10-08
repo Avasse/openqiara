@@ -104,14 +104,15 @@ pas un état, elles déclenchent un effet.
 
 | Méthode | Chemin | Corps | Réponse |
 |---|---|---|---|
-| `GET` | `/api/v1/sensors` | — | tableau de capteurs + `label`, `night_allowed` |
-| `PUT` | `/api/v1/sensors/{id}` | au moins un champ parmi `label`, `night_allowed` | `{ok:true}` |
+| `GET` | `/api/v1/sensors` | — | tableau de capteurs + `label`, `night_allowed`, `instant` |
+| `PUT` | `/api/v1/sensors/{id}` | au moins un champ parmi `label`, `night_allowed`, `instant` | `{ok:true}` |
 | `DELETE` | `/api/v1/sensors/{id}` | — | `{ok:true}` |
 
 `GET /sensors` renvoie l'état connu de chaque capteur, sans interroger la
 radio : les capteurs le signalent eux-mêmes, et les changements arrivent
 par le flux SSE. `night_allowed` : capteur ignoré quand l'alarme
-(`standalone`) est armée pour la nuit.
+(`standalone`) est armée pour la nuit. `instant` : capteur qui déclenche
+la sirène sans délai d'entrée (une fenêtre), en `standalone` aussi.
 
 ### Appairage
 

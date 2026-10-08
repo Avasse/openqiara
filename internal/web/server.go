@@ -519,6 +519,7 @@ func (s *Server) handleSensors(w http.ResponseWriter, r *http.Request) {
 		camera.Sensor
 		Label        string `json:"label"`
 		NightAllowed bool   `json:"night_allowed"`
+		Instant      bool   `json:"instant"`
 	}
 	entries := make(map[int]config.SensorEntry)
 	for _, se := range s.store.Get().Sensors {
@@ -527,7 +528,7 @@ func (s *Server) handleSensors(w http.ResponseWriter, r *http.Request) {
 	result := make([]sensorWithMeta, 0, len(sensors))
 	for _, sensor := range sensors {
 		se := entries[sensor.ID]
-		result = append(result, sensorWithMeta{Sensor: sensor, Label: se.Label, NightAllowed: se.NightAllowed})
+		result = append(result, sensorWithMeta{Sensor: sensor, Label: se.Label, NightAllowed: se.NightAllowed, Instant: se.Instant})
 	}
 
 	writeJSON(w, http.StatusOK, result)
@@ -666,6 +667,7 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Label        *string `json:"label,omitempty"`
 		NightAllowed *bool   `json:"night_allowed,omitempty"`
+		Instant      *bool   `json:"instant,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "JSON invalide")
@@ -675,7 +677,7 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 		trimmed := strings.TrimSpace(*body.Label)
 		body.Label = &trimmed
 	}
-	if body.Label == nil && body.NightAllowed == nil {
+	if body.Label == nil && body.NightAllowed == nil && body.Instant == nil {
 		writeErr(w, http.StatusBadRequest, "au moins un champ requis")
 		return
 	}
@@ -686,6 +688,9 @@ func (s *Server) handleUpdateSensor(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.NightAllowed != nil {
 			e.NightAllowed = *body.NightAllowed
+		}
+		if body.Instant != nil {
+			e.Instant = *body.Instant
 		}
 	}
 
