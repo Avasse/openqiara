@@ -174,22 +174,11 @@ func main() {
 		// Re-pushed on every (re)connect so HA recovers after a broker/HA
 		// restart without a daemon reboot.
 		mqttPub.HAPublisher().SetOnConnect(func() {
-			for _, s := range sensors {
+			for _, s := range cam.CachedSensors() {
 				if s.Type == "KPD" {
 					continue
 				}
-				updated, err := cam.ReadSensor(ctx, s.ID)
-				if err != nil {
-					// Expected when a sensor hasn't emitted a PKT event yet —
-					// c.sensors is populated lazily. Debug to avoid noisy WARNs.
-					logger.Debug("state read skipped (no live state yet)", "id", s.ID, "error", err)
-					continue
-				}
-				updated.TypeName = s.TypeName
-				updated.ItemID = s.ItemID
-				updated.Type = s.Type
-				updated.Reachable = s.Reachable
-				if err := mqttPub.PublishSensorState(ctx, *updated); err != nil {
+				if err := mqttPub.PublishSensorState(ctx, s); err != nil {
 					logger.Warn("publish sensor state failed", "id", s.ID, "error", err)
 				}
 			}
