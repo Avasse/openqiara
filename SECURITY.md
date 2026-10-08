@@ -45,7 +45,8 @@ listées ici pour référence :
 - `/events` (push fbxhome → openqiarad) accessible sans auth
 - Endpoints `/api/v1/commands/debug/pkt` et `/api/v1/commands/debug/siren/sequence` activables
   via `-debug` — peuvent brick le MCU (opcodes `0x03`, `0x08`)
-- Le boot script ouvre tous les ports en INPUT (politique ACCEPT all)
+- Le boot script ouvre tous les ports en INPUT (politique ACCEPT all). Restreignable
+  via `/data/post_boot.sh` (voir [`docs/install.md`](docs/install.md)), IPv4 seulement
 
 Le durcissement est planifié mais ne doit pas être considéré comme acquis.
 

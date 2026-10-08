@@ -299,3 +299,8 @@ fi
         rm -f /data/boot_debug.log.old /data/fbxhome.log.old /data/dnsmasq.log.old 2>/dev/null
     done
 ) &
+
+# User hook, run last: local tweaks (firewall rules…) live in
+# /data/post_boot.sh, which updates never touch, unlike this file.
+# See docs/install.md § « Personnaliser le boot ».
+[ -f /data/post_boot.sh ] && sh /data/post_boot.sh >> /data/post_boot.log 2>&1
