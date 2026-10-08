@@ -123,6 +123,33 @@ dd if=/dev/mmcblk0p1 | gzip > /data/rootfs_backup.gz
 ssh root@<IP> 'cat /data/rootfs_backup.gz' > ./rootfs_backup_patched.gz
 ```
 
+## Personnaliser le boot (`post_boot.sh`)
+
+Si `/data/post_boot.sh` existe, `boot.sh` l'exécute à la fin du démarrage (sortie dans
+`/data/post_boot.log`). Les mises à jour remplacent `boot.sh` mais ne touchent jamais ce
+fichier : c'est l'endroit pour tes réglages locaux.
+
+Exemple : n'autoriser en TCP que Home Assistant et le poste d'admin (proposé par
+@Avasse, #44).
+
+```sh
+# /data/post_boot.sh
+iptables -D INPUT -p tcp -j ACCEPT              # retire l'ouverture TCP de boot.sh
+iptables -I INPUT 3 -p tcp --dport 22 -j ACCEPT # SSH toujours ouvert, anti-lockout
+for src in 192.168.1.10 192.168.1.20; do
+    iptables -I INPUT 3 -s "$src" -j ACCEPT
+done
+```
+
+> ⚠️ À utiliser en connaissance de cause :
+> - **IPv6 n'est pas filtré** (le kernel n'a pas `ip6tables`) : l'allowlist se
+>   contourne par l'adresse IPv6 de la caméra.
+> - **HomeKit casse** (port 51827) sauf si tu ajoutes tes appareils Apple, dont
+>   l'IP change avec le DHCP.
+> - L'UDP reste ouvert : le bloquer casse le renouvellement DHCP et le flux RTP.
+>
+> Teste depuis une machine hors allowlist avant de t'y fier.
+
 ## Changer de réseau WiFi
 
 ```bash
