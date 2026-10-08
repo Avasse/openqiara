@@ -44,7 +44,7 @@ HA découvre aussi le bridge via l'intégration HomeKit Controller (mDNS/Bonjour
 ## Commandes entrantes
 
 - **SecuritySystem** : quand l'utilisateur arme/désarme depuis Apple Home, le callback `OnAlarmCommand` dispatch via le mode courant (engine local en standalone, `alarmo/command` MQTT en mode Alarmo). `Source=Remote` → pas de délai d'armement, check immédiat post-arm sur les capteurs déjà en alarme.
-- **Switch SRN** : `OnSirenCommand` route via `cam.TriggerSirenAlarm` (fbxhome) ou `CharmuxClient.SendSirenAlarm` (charmux). Le "off" déclenche `cam.StopSiren` : en mode fbxhome = `fbxbusctl call fbxhome reboot_srn` (effet de bord : 3-5s de resync SRN avant de pouvoir le retrigger).
+- **Switch SRN** : `OnSirenCommand` route via `cam.TriggerSirenAlarm`. Le "off" déclenche `cam.StopSiren`.
 
 ## Limitations
 

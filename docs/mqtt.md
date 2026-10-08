@@ -97,12 +97,7 @@ Command:   openqiara/siren/<ID>/set   (payload: "true"/"false" ou "ON"/"OFF")
 State:     openqiara/sensor/<ID>/state  {"active": false, "battery": 35, "reachable": true}
 ```
 
-HA envoie `true`/`ON` → `cam.TriggerSirenAlarm` (test discret en mode
-fbxhome, vrai wail en charmux). HA envoie `false`/`OFF` → `cam.StopSiren`
-(`reboot_srn` fbxbus en mode fbxhome, 3-5s de resync).
-
-⚠️ En mode `fbxhome`, le wail est limité au son du test discret
-(volume bas, ~10s) — voir [`README.md`](../README.md) "Known limitations".
+HA envoie `true`/`ON` → `cam.TriggerSirenAlarm`. HA envoie `false`/`OFF` → `cam.StopSiren`.
 
 ### Alarme (alarm_control_panel)
 

@@ -91,11 +91,11 @@ POST http://<camera>:8080/api/v1/commands/shutter
 {"open": false}  # fermer
 ```
 
-Le shutter est contrôlé via le canal charmux Shutter (port 8006), pas par fbxhome.
+Le shutter est contrôlé via le canal charmux Shutter (port 8006).
 
 ## Limitations
 
 - **Latence ~5s** : inhérente au protocole HLS
 - **Pas de HKSV** : HomeKit Secure Video (enregistrement) non implémenté
 - **Audio silencieux** : transcodage AAC-ELD en cours (CGo libfdk-aac via zigcc)
-- **Shutter + hlcamd conflit** : en mode charmux pur, hlcamd occupe le port Shutter 8007. openqiarad contourne en envoyant via UDP sans bind.
+- **Shutter + hlcamd conflit** : hlcamd occupe le port Shutter 8007. openqiarad contourne en envoyant via UDP sans bind.

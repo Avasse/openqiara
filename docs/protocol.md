@@ -136,28 +136,11 @@ already-provisioned camera. State `0x09` is good enough for routine use.
 
 ## 4. Pairing
 
-There are two paths to pair a sensor: the legacy **fbxhome HTTP API** (used
-by `internal/camera/fbxhome.go` when running in proxy mode) and the **direct
-charmux handshake** (used in `mode=charmux` standalone).
+OpenQiara pairs sensors with a direct charmux handshake (`domus.Pair`), then
+provisions them like after any restart. (The pairing wizard of the vendor
+`fbxhome` HTTP API is no longer used.)
 
-### 4.1 fbxhome HTTP API (legacy mode)
-
-```http
-POST /api/v1/home/pairing
-Header: X-Hlcore-Session-Id: <session>
-
-Start: {"op": "start_adapter", "node_type": "HOMELABDWS",
-        "adapter_type": "Adapter.DomusAdapter"}
-Poll:  {"op": "poll", "session": <id>}
-Stop:  {"op": "stop", "session": <id>}
-```
-
-Authentication: get a session via `fbxbusctl call create_login_session 1 1`,
-then pass the returned token in `X-Hlcore-Session-Id`.
-
-### 4.2 Direct charmux handshake (standalone mode)
-
-This is the path OpenQiara uses by default. It bypasses fbxhome entirely.
+### 4.1 Direct charmux handshake
 
 **Step A — CTRL handshake:**
 
@@ -196,7 +179,7 @@ strict request-response dialog over PKT, driven by the sensor:
 The bytecode itself is sensor-type-specific. See `internal/domus/bytecode.go`
 for the OpenQiara-shipped bytecode tables (DWS, PIR, KPD, SRN).
 
-### 4.3 Pairing persistence
+### 4.2 Pairing persistence
 
 - **Pairing 0x15/0x1a (charmux)** persists in MCU NVM. After a reboot, the
   sensor is still associated and will resume sending events without
@@ -345,7 +328,7 @@ the opcode.
   obtains battery levels via the Sigfox cloud API (`HlSrn::send_get_sf_info`)
   which is offline since Qiara shut down. A `wflags=0x82` frame has been
   observed once for a low-battery PIR warning, but no continuous reporting
-  exists in charmux mode.
+  has been found.
 
 ### 6.3 KPD events
 
@@ -492,76 +475,27 @@ inject fake events**, which is by design.
 | **Bytecode** | A small VM program pushed to a sensor at pairing time, declaring its endpoints, signals, and behaviour |
 | **Vendor key** | 32-byte AES master key, one per OEM family, used to derive per-sensor session keys |
 | **Cofidur EMS** | The French electronics manufacturer that builds Qiara sensors |
-| **fbxhome** | The original Qiara/Free daemon. OpenQiara replaces its application layer but can also coexist with it (proxy mode) |
+| **fbxhome** | The original Qiara/Free daemon. OpenQiara replaces its application layer: `fbxhome` is stopped at boot and `openqiarad` is the radio gateway |
 | **EZR32LG** | Silicon Labs MCU (Cortex-M3 + Si446x radio) inside the camera |
 | **uartboot** | Vendor binary that flashes the MCU firmware over UART at every camera boot |
 
 ---
 
-## 11. fbxhome binary patch — decoupling KPD from HlAlarm
+## 11. Historical: fbxhome KPD → HlAlarm coupling
 
-When `openqiarad` runs in `alarm.mode = alarmo` (Home Assistant Alarmo is
-the source of truth), the vendor `fbxhome` daemon still tries to drive
-its own internal alarm state machine in parallel: every `KPD_DAY_ALARM`
-/ `KPD_NIGHT_ALARM` makes it transition the SRN to
-`TIMEOUT_BEFORE_ARMED` and emit an arming beep, independent of what
-Alarmo decides. Effects:
+*No longer relevant: `fbxhome` is not run any more (no patch, no `reboot_srn`).
+Kept as reverse-engineering notes.*
 
-- Double pilotage of the SRN (`fbxhome` and `openqiarad` both issuing commands).
-- fbxhome's internal arming rules (per-sensor `day_alarm`/`night_alarm`
-  flags) can be different from Alarmo's → triggers `fbxhome`'s own wail
-  in cases where Alarmo would not have armed at all.
-- `fbxhome` calls `reboot_srn` on every `KPD_ALARM_OFF`, causing a
-  3–5 s SRN resync.
-
-### What was tried first
-
-All the non-invasive routes turned out to be dead ends:
-
-- `endpoints_write day_alarm=false` / `night_alarm=false` / `alarm_enabled=false` →
-  HTTP returns 200 OK with body `{"message":"Not allowed","reason":5}`
-  for any session via `create_login_session` (regardless of `acl_group`).
-- No fbxbus method to set the alarm status (`alarm_status_get` exists but
-  is read-only; no `set_alarm_status` symbol).
-- Deleting the `<NodeLink>` entries linking the KPD to HlAlarm in
-  `/data/fbxhome.xml`: fbxhome regenerates them at runtime from a static
-  vendor descriptor.
-- Changing `<Node ... type="Node.HlAlarm" alarm_type="N">` in the XML
-  for any value 0..4: accepted by fbxhome but doesn't disable arming.
-
-### The patch
-
-The pilotage actually flows from `HLKpd::event_slot_type::virtual_8` →
-HlAlarm via a virtual signal/slot call (`blx r4`), not via the imported
-symbol `hls_set_alarm_status`. The handler is a switch on the KPD event
-type (0 = `KPD_ALARM_OFF`, 1 = `KPD_DAY_ALARM`, 2 = `KPD_NIGHT_ALARM`,
-3 = `KPD_EMERGENCY`, 4 = `KPD_TAMPER`).
-
-We NOP the two `blx r4` instructions that propagate the **arming** cases
-(1 and 2) to HlAlarm. The disarm case (0) is left intact. The
-`HlKpd: KPD_DAY_ALARM` log line is emitted *before* the NOPed call, so
-`openqiarad`'s tail of `/var/log/fbxhome.log` still captures the event
-and relays it to Alarmo.
-
-| File offset | Original | Patched | Purpose |
-|-------------|----------|---------|---------|
-| `0xa4a84` | `34 ff 2f e1` (`blx r4`) | `00 00 a0 e1` (NOP) | case 1 = `KPD_DAY_ALARM` |
-| `0xa4aec` | `34 ff 2f e1` (`blx r4`) | `00 00 a0 e1` (NOP) | case 2 = `KPD_NIGHT_ALARM` |
-
-(Validated against fbxhome with MD5 `2fd2a52eb187910176ae81a7432342ef`;
-the patched binary's MD5 is `8c89fd04c4f16967cc8900761a464017`.)
-
-### How it's deployed
-
-The patched binary lives on the data partition at
-`/data/fbxhome.patched`. `scripts/camera_boot.sh` checks at boot whether
-it differs from `/usr/bin/fbxhome`; if so it remounts `/` rw, copies the
-patched binary in place, and remounts ro. The original is backed up to
-`/usr/bin/fbxhome.orig` (kept on the rootfs).
-
-To revert: `rm /data/fbxhome.patched` (and `cp /usr/bin/fbxhome.orig
-/usr/bin/fbxhome` after a remount rw if the patch was already applied
-this boot).
+The vendor `fbxhome` drove its own internal alarm state machine from KPD
+events: `HLKpd::event_slot_type::virtual_8` → HlAlarm via a virtual
+signal/slot call (`blx r4`). The handler is a switch on the KPD event type
+(0 = `KPD_ALARM_OFF`, 1 = `KPD_DAY_ALARM`, 2 = `KPD_NIGHT_ALARM`,
+3 = `KPD_EMERGENCY`, 4 = `KPD_TAMPER`). It also called `reboot_srn` on every
+`KPD_ALARM_OFF`. The two `blx r4` of the arming cases (file offsets `0xa4a84`
+and `0xa4aec` in the binary with MD5 `2fd2a52eb187910176ae81a7432342ef`) were
+the only way found to cut this coupling: `endpoints_write` on
+`day_alarm`/`night_alarm`/`alarm_enabled` answered `{"message":"Not allowed","reason":5}`,
+and editing `/data/fbxhome.xml` was undone by fbxhome at runtime.
 
 ## 12. Open questions
 

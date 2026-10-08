@@ -377,6 +377,8 @@ consecutive frames to the same sensor.
 
 ## 6.11 fbxhome `-U 1` flag = use local update_manifest (2026-05-13)
 
+> Obsolète depuis 2026-10 : fbxhome n'est plus lancé, openqiarad est la passerelle radio.
+
 When `fbxhome` runs without the cloud (post-Free shutdown), the
 `UpdateManager::fetch` HTTP call to `<x>.srv.home-labs.fr/update_manifest`
 fails silently. Without that manifest, fbxhome never sets `target_fw_fnv`
@@ -407,6 +409,8 @@ needed.
 
 ## 6.10 Fingerprint submission for fbxhome pairing (2026-05-13)
 
+> Obsolète depuis 2026-10 : fbxhome n'est plus lancé, openqiarad est la passerelle radio.
+
 fbxhome's pairing flow walks through a series of UI layouts. The first
 one after `start_adapter` is `QRCode` — fbxhome refuses to advance until
 it gets the 16-char hex fingerprint of the sensor (the prefix of the QR
@@ -432,6 +436,8 @@ Verified pairing flow 2026-05-13: DWS got node ID 14, paired in ~25s
 through fbxhome end-to-end, no manual RE-driven CTRL handshake.
 
 ## 6.9 Switch to mode=fbxhome (2026-05-13)
+
+> Obsolète depuis 2026-10 : fbxhome n'est plus lancé, openqiarad est la passerelle radio.
 
 After ~11 days of charmux mode in production, the conclusion is that
 charmux works for **the happy path** (a sensor freshly paired stays

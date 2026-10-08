@@ -6,7 +6,8 @@ l'aise avec SSH et Home Assistant, mais **ne suppose pas** de connaissances
 en reverse engineering.
 
 > **TL;DR** — OpenQiara est un daemon overlay qui remplace l'application
-> `fbxhome` cloud-dépendante d'une caméra Qiara par un service Go 100% local.
+> `fbxhome` cloud-dépendante d'une caméra Qiara par un service Go 100% local
+> (`fbxhome` est arrêté au boot).
 > Tes capteurs continuent de marcher, ta caméra n'a plus besoin des serveurs
 > Qiara (désormais défunts), et tout se retrouve dans MQTT.
 
@@ -100,7 +101,7 @@ export MQTT_PASS=changeme
 ```
 
 Tu devrais voir `openqiarad` démarrer dans le log tailé à la fin de
-`deploy.sh`. Si tu vois `MQTT connected` et `charmux ready`, c'est bon.
+`deploy.sh`. Si tu vois `MQTT connected`, c'est bon.
 
 ---
 
@@ -132,7 +133,7 @@ OpenQiara sert une petite web UI à `http://openqiara.local` (port 80).
 Depuis là tu peux :
 
 - **Voir l'état des capteurs** en temps réel (motion, porte ouverte/fermée, codes KPD)
-- **Appairer de nouveaux capteurs** (clic "Pairing" → saisir le fingerprint QR)
+- **Appairer de nouveaux capteurs** (clic "Pairing", puis mettre le capteur en mode appairage)
 - **Configurer le moteur d'alarme** (mode standalone ou bridge Alarmo)
 - **Régler les timings** (délai d'armement, délai pending, durée du wail)
 - **Définir le PIN du clavier**
@@ -208,10 +209,11 @@ depuis OpenQiara et définis un nouveau PIN via la web UI. Voir
 [`docs/kpd.md`](kpd.md).
 
 **"Batterie / température affiche 0"**
-Batterie et température en mode charmux ne sont pas lisibles actuellement —
-fbxhome obtenait ces valeurs du cloud Qiara Sigfox qui est offline. La web UI
-masque les champs à 0. Voir la section "Open questions" de
-[`docs/protocol.md`](protocol.md) pour l'état actuel du RE.
+La batterie arrive avec le heartbeat de statut de chaque capteur, toutes
+les ~6 h : 0 tant qu'il n'en a pas envoyé depuis l'appairage (le dernier
+niveau est ensuite gardé d'un redémarrage à l'autre). Seule la sirène
+donne un vrai niveau ; porte, PIR et clavier envoient toujours 255. Aucune
+source de température n'est connue : la web UI masque les champs à 0.
 
 **"La caméra redémarre aléatoirement"**
 Vérifie que tu n'envoies pas d'opcodes CTRL dangereux (`0x03`, `0x08`) — ils

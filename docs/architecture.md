@@ -3,22 +3,22 @@
 ## Vue d'ensemble
 
 OpenQiara est un **overlay** sur le rootfs stock de la caméra. Il ne re-flashe
-pas le firmware. Le daemon constructeur `fbxhome` reste en charge de la radio
-868 MHz et de la crypto MCU ; `openqiarad` le proxifie pour exposer les
-capteurs à Home Assistant / HomeKit, et fait tourner le moteur d'alarme local
-(ou le bridge vers l'Alarmo de Home Assistant).
+pas le firmware. `openqiarad` est lui-même la passerelle radio : le daemon
+constructeur `fbxhome` est arrêté au boot, et `openqiarad` parle directement au
+MCU pour exposer les capteurs à Home Assistant / HomeKit, et fait tourner le
+moteur d'alarme local (ou le bridge vers l'Alarmo de Home Assistant).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ Caméra Qiara                                                 │
 │                                                              │
-│  ┌────────────┐ HTTPS  ┌─────────┐ charmux  ┌──────────────┐ │
-│  │ openqiarad │◄──────►│ fbxhome │◄────────►│ MCU EZR32LG  │ │
-│  │            │ :64218 │ (vendor)│  UART    │ radio Si446x │ │
-│  │  ┌──────┐  │        │ patché  │          │  868MHz      │ │
-│  │  │Web UI│  │ tail   │         │          └──────────────┘ │
-│  │  └──────┘  │◄──────fbxhome.log│                           │
-│  └─────┬──────┘        └─────────┘                           │
+│  ┌────────────┐  UDP 8001/8003  ┌────────┐   ┌─────────────┐ │
+│  │ openqiarad │◄───────────────►│charmux │◄─►│ MCU EZR32LG │ │
+│  │            │                 │(vendor)│   │ radio Si446x│ │
+│  │  ┌──────┐  │                 └────────┘   │  868MHz     │ │
+│  │  │Web UI│  │                              └─────────────┘ │
+│  │  └──────┘  │                                              │
+│  └─────┬──────┘                                              │
 │        │ :80                                                 │
 └────────┼─────────────────────────────────────────────────────┘
          │ WiFi
@@ -31,39 +31,7 @@ capteurs à Home Assistant / HomeKit, et fait tourner le moteur d'alarme local
                         └──────────────────┘
 ```
 
-Le binaire fbxhome est patché (2 NOPs) pour découpler le KPD de la machine à
-états d'alarme interne de fbxhome — voir
-[`protocol.md`](protocol.md) § "fbxhome binary patch".
-
-## Modes caméra
-
-OpenQiara peut parler au MCU de deux façons, sélectionnées au démarrage via
-`-mode fbxhome|charmux` (défaut `fbxhome`, le mode de production) ; le mode
-**charmux** doit le remplacer. Aucun choix automatique : prendre la radio de
-l'alarme se demande explicitement.
-
-### Mode fbxhome (par défaut, recommandé)
-
-OpenQiara utilise le binaire fbxhome existant comme proxy :
-
-```
-openqiarad → HTTPS [::1]:64218 → fbxhome → charmux → MCU
-            (api/v1/home/*)
-```
-
-Appairage via l'API fbxhome. Events capteurs en temps réel via tail de
-`/var/log/fbxhome.log` (package `internal/fbxhomelog`), avec un filet de
-sécurité polling à 5 min. Un polling agressif à 2s a été identifié le
-2026-05-13 comme cause de saturation de fbxhome (cascade 502 nginx +
-instabilité KPD post-batterie), d'où l'architecture tail-first.
-
-Compromis : conserve la gestion crypto MCU, la logique heartbeat, et le flow
-de push de bytecode de fbxhome. On perd un peu de contrôle bas niveau sur la
-radio.
-
-### Mode charmux (openqiarad passerelle radio, en validation)
-
-OpenQiara est lui-même la passerelle radio, fbxhome arrêté :
+## Passerelle radio
 
 ```
 openqiarad → UDP 8001/8003 → charmux → MCU
@@ -75,26 +43,24 @@ une réponse (Z), pousse bytecode, heure, config et codes clavier quand le
 capteur les demande, et traduit ses trames en événements. Rejoué sur les
 logs de fbxhome en production (`cmd/radio-shadow`), il ne diffère d'aucune
 trame. L'appairage (`domus.Pair`) ne fait que le handshake CTRL : le
-capteur est ensuite provisionné comme après n'importe quel redémarrage.
+capteur est ensuite provisionné comme après n'importe quel redémarrage. Le
+premier capteur du type demandé qui passe en mode appairage est pris.
 
 Le registre des capteurs est la config (`sensors[].radio` : adresse, UID,
-index système). Au premier démarrage, il est importé de `fbxhome.xml` :
-chaque capteur garde son id fbxhome, donc ses entités Home Assistant et
-Alarmo. Le mode jour/nuit passe par `fbxbusctl set hlcamd video_settings`,
-le volet par le canal charmux 8006/8007.
+index système). Au premier démarrage, il est importé de `/data/fbxhome.xml.*`
+(`ImportFbxhomeRadio`) : chaque capteur garde son id, donc ses entités Home
+Assistant et Alarmo. Le mode jour/nuit passe par `fbxbusctl set hlcamd
+video_settings`, le volet par le canal charmux 8006/8007.
 
-Le démarrage échoue tant que fbxhome tourne : il tient les ports charmux.
-Retour arrière : relancer fbxhome, dont l'état est intact tant qu'aucun
-capteur n'a été appairé ni supprimé en mode charmux (fbxhome ne le saurait
-pas et redonnerait une adresse déjà prise). `-log-level debug` trace chaque
-trame (sans les codes clavier).
+`camera_boot.sh` arrête fbxhome au boot, puis lance `openqiarad` : le
+démarrage échoue tant que fbxhome tourne, car il tient les ports charmux.
+`-log-level debug` trace chaque trame (sans les codes clavier).
 
-La sirène reçoit la durée du wail dans la trame et s'arrête d'elle-même,
-comme avec fbxhome. Pas de bip d'armement ni de désarmement : leurs trames
-font passer la sirène par ses propres états, question ouverte.
+La sirène reçoit la durée du wail dans la trame et s'arrête d'elle-même.
+Pas de bip d'armement ni de désarmement : leurs trames font passer la sirène
+par ses propres états, question ouverte.
 
-Pas encore validé sur matériel ; non géré : capteurs derrière un répéteur,
-redémarrage à distance de la sirène.
+Non géré : capteurs derrière un répéteur, redémarrage à distance de la sirène.
 
 ## Layout rootfs
 
@@ -104,7 +70,7 @@ dans l'init existant.
 
 | Partition | Montage | Contenu |
 |-----------|-------|---------|
-| mmcblk0p1 | / | Rootfs stock constructeur (kernel, drivers, fbxhome, charmux, uartboot, hlcamd, nginx) |
+| mmcblk0p1 | / | Rootfs stock constructeur (kernel, drivers, charmux, uartboot, hlcamd, nginx ; fbxhome y reste mais est arrêté au boot) |
 | mmcblk0p2 | /data | Binaire openqiarad, config persistante, état capteurs, état moteur d'alarme, log |
 | mmcblk0p3 | /media | Stockage média (segments HLS, etc.) |
 
@@ -113,21 +79,18 @@ dans l'init existant.
 - Modules kernel (WiFi `ssv6x5x`, capteurs caméra, etc.)
 - Firmware MCU (`hlcam02_ctrl.bin`) flashé à chaque boot par `uartboot`
 - Multiplexeur UART `charmux`
-- `fbxhome` — gardé en production pour la radio + crypto MCU + push bytecode.
-  Patché (2 NOPs) pour qu'il arrête de piloter sa propre machine à états
-  d'alarme interne sur les events KPD ; voir `protocol.md`.
 - `hlcamd` + `hls` pour le pipeline vidéo
-- `nginx` (écoute toujours sur :64218 pour l'API HTTPS fbxhome)
+- `nginx`
 - SSH `dropbear`
 
 ### Ce qu'on ajoute
 - `openqiarad` sur `/data` — le daemon qui chapeaute tout : discovery MQTT
   pour HA, bridge HomeKit, moteur d'alarme, web UI sur `:80`.
-- `boot.sh` sur `/data` — applique le patch fbxhome au boot, démarre le
-  daemon, gère le watchdog.
+- `boot.sh` sur `/data` — arrête fbxhome, neutralise le reboot périodique
+  (`fbxbusctl call watchdog_mcu set_timeout`), démarre le daemon
+  (`/data/openqiarad -web :80 -log /data/openqiarad.log`).
 
-OpenQiara ne remplace **pas** le système init, `fbxhome`, `hlconnman`, ni
-`nginx`. Il coexiste avec eux.
+OpenQiara ne remplace **pas** le système init, `hlconnman`, ni `nginx`.
 
 ## Structure du module Go
 
@@ -139,23 +102,20 @@ openqiara/
 │   ├── mcu-info/           # Lecteur d'info MCU (debug)
 │   ├── charmux-test/       # Client charmux debug (debug)
 │   ├── decode-frame/       # Décodeur de managed frame (debug)
-│   ├── fbxbus-poc/         # PoC protocole fbxbus (debug)
+│   ├── radio-shadow/       # Rejoue les logs fbxhome contre internal/radio (debug)
 │   └── rtptest/            # Test pipeline SRTP/RTP (debug)
 ├── internal/
 │   ├── alarm/              # Machine à états d'alarme autonome
 │   │   └── engine.go       # Transitions d'état, armement Source-aware, timers, persistance
 │   ├── camera/             # Interface client caméra + implémentations
 │   │   ├── client.go       # Interface Client (Sensors, Pair, Events, SendPKT, SetShutter, TriggerSiren)
-│   │   ├── fbxhome.go      # FbxhomeClient (proxy HTTPS — voie de production)
-│   │   ├── charmux_client.go # CharmuxClient (MCU direct — debug / legacy)
-│   │   ├── logwatcher.go   # Watcher d'events KPD sur fbxhome.log (kpd_id dynamique)
-│   │   ├── kpdcodes.go     # Gestion XML des codes KPD
+│   │   ├── radio.go        # RadioClient (openqiarad passerelle radio, via internal/radio)
+│   │   ├── fbxhome_xml.go  # ImportFbxhomeRadio (import des capteurs de fbxhome.xml)
 │   │   └── types.go        # Sensor, SensorEvent, etc.
 │   ├── charmux/            # Client UDP charmux bas niveau
-│   ├── fbxbus/             # Client IPC fbxbus (protocole binaire type DBus)
-│   ├── fbxhomelog/         # Tail de /var/log/fbxhome.log → events capteurs (temps réel)
+│   ├── radio/              # Moteur radio : réponses aux trames, provisioning capteurs
 │   ├── config/             # Store de config JSON
-│   ├── domus/              # Handshake d'appairage DomusRF (mode charmux)
+│   ├── domus/              # Handshake d'appairage DomusRF
 │   ├── mdns/               # Annonce mDNS (openqiara.local)
 │   ├── mqtt/               # Publisher MQTT HA + discovery
 │   ├── publisher/          # Abstraction Publisher (MQTT + HomeKit en parallèle)

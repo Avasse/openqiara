@@ -13,19 +13,16 @@ qui dialogue avec les capteurs 868 MHz existants et les expose à
 ┌──────────────┐      MQTT       ┌─────────────────────────────┐
 │ Home         │◄───────────────►│ Caméra Qiara                │
 │ Assistant    │  auto-discovery │                             │
-│ + Alarmo     │                 │  openqiarad ──► fbxhome ──► │
-└──────────────┘                 │                  │       MCU│
-                                 │              (charmux UART) │
-                                 │              radio 868 MHz  │
+│ + Alarmo     │                 │  openqiarad ──► MCU         │
+└──────────────┘                 │            (UART, 868 MHz)  │
                                  └─────────────────────────────┘
 ```
 
-Par défaut, `openqiarad` tourne en **mode proxy `fbxhome`** : le daemon
-constructeur `fbxhome` reste en charge de la radio (cycle de vie des capteurs,
-crypto MCU), et `openqiarad` discute avec son API HTTP locale + suit son fichier
-de log. Un mode `charmux` direct (sans `fbxhome`) existe également, mais ce
-n'est pas la voie recommandée aujourd'hui — on y perd la crypto MCU de fbxhome
-et la gestion du heartbeat.
+`openqiarad` est lui-même la passerelle radio : le daemon constructeur
+`fbxhome` est arrêté au boot, et `openqiarad` pilote directement le MCU
+(appairage, heartbeat, crypto, bytecode des capteurs). Au premier démarrage, il
+importe les capteurs déjà appairés depuis `/data/fbxhome.xml.*` en gardant
+leurs IDs.
 
 ## Statut
 
@@ -51,7 +48,7 @@ Attends-toi à des rugosités. Cas probablement non gérés :
   shutdown, mais le bootloader appelle toujours la maison s'il est joignable).
 
 Si tu tombes sur un cas non couvert, ouvre une issue avec les logs pertinents
-de `/data/openqiarad.log` et `/var/log/fbxhome.log`. Les PR sont les bienvenues.
+de `/data/openqiarad.log`. Les PR sont les bienvenues.
 
 | Fonctionnalité | Statut |
 |---------|--------|
@@ -66,7 +63,8 @@ de `/data/openqiarad.log` et `/var/log/fbxhome.log`. Les PR sont les bienvenues.
 | **Vidéo live caméra HomeKit** | ✅ (SRTP pure-Go natif, sans ffmpeg) |
 | Audio caméra HomeKit | ⚠️ silencieux (transcodeur CGo libfdk-aac à venir) |
 | Web UI pour appairage & config | ✅ |
-| Reporting batterie / température | ✅ |
+| Batterie | ⚠️ niveau réel pour la sirène seulement |
+| Température | ❌ |
 
 ## Matériel supporté
 
@@ -90,26 +88,10 @@ mort — pas des bugs à corriger en bidouillant `openqiarad`.
 - **PIN clavier.** Un seul PIN par clavier. Ajouter un second code via l'API
   stock nécessite une autorisation cloud et échoue silencieusement en offline.
 
-- **Volume du wail d'intrusion sirène.** Les endpoints `test_power` et
-  `test_duration` sont en lecture seule via l'API locale fbxhome, donc le
-  "wail" qu'on déclenche en intrusion est le même son discret que le bouton de
-  test manuel (~10 s, faible puissance). Un vrai wail pleine puissance
-  nécessiterait de pousser fbxhome dans son état interne `alarm_trigged` (ou de
-  parler directement au SRN en mode charmux) — ni l'un ni l'autre n'est fait
-  aujourd'hui.
-
 - **Sirène après remise sous tension physique.** Débrancher puis rebrancher le
   SRN peut le laisser `reachable=1` mais muet, ou complètement injoignable.
-  Récupération : `fbxbusctl call fbxhome reboot_srn` pour le cas muet, remise
-  sous tension physique complète si totalement injoignable. Voir
+  Récupération : remise sous tension physique complète. Voir
   [`docs/sensors.md`](docs/sensors.md).
-
-- **Patch binaire constructeur requis.** Pour utiliser `openqiarad` comme seul
-  contrôleur d'alarme (surtout en mode `alarmo`), on patche deux instructions
-  dans `/usr/bin/fbxhome` pour que le KPD cesse de piloter en parallèle la
-  machine à états d'alarme interne de fbxhome. Le patch est appliqué au boot
-  depuis `/data/fbxhome.patched`. Détails et offsets dans
-  [`docs/protocol.md`](docs/protocol.md) (§ "fbxhome binary patch").
 
 - **Audio caméra HomeKit.** La vidéo marche, l'audio est silencieux. HomeKit
   exige de l'AAC-ELD ; le pipeline pure-Go ne le transcode pas encore.
@@ -173,13 +155,12 @@ BASE=https://github.com/Caligone/openqiara/releases/download/$VERSION
 curl -LO $BASE/openqiarad-linux-arm7
 curl -LO $BASE/sd_setup.sh          # macOS ; sur Linux : curl -LO $BASE/sd_setup_ubuntu.sh
 curl -LO $BASE/camera_boot.sh   # requis : sd_setup.sh le copie dans /data/boot.sh
-curl -LO $BASE/patch_fbxhome.sh
 curl -LO $BASE/SHA256SUMS
 
 # Vérification d'intégrité
 shasum -a 256 -c SHA256SUMS
 
-chmod +x sd_setup.sh patch_fbxhome.sh
+chmod +x sd_setup.sh
 ```
 
 > `sd_setup.sh` cherche `camera_boot.sh` à côté de lui (install release-only)
@@ -256,22 +237,7 @@ arp -a | grep lwip
 >    `-o PubkeyAcceptedAlgorithms=+ssh-rsa`, ou utilise une clé ed25519 qui
 >    n'a pas ce problème.
 
-### 5. Patcher fbxhome (recommandé)
-
-Pour qu'OpenQiara pilote l'alarme sans interférence du démon vendor (cf
-[`docs/protocol.md` §11](docs/protocol.md)), patche `fbxhome` sur la cam :
-
-```bash
-scp -i ~/.ssh/id_ed25519 patch_fbxhome.sh root@<ip-cam>:/tmp/
-ssh -i ~/.ssh/id_ed25519 root@<ip-cam> 'sh /tmp/patch_fbxhome.sh'
-ssh -i ~/.ssh/id_ed25519 root@<ip-cam> reboot
-```
-
-Le script vérifie le MD5 du binaire vendor avant d'appliquer le patch ; il
-abandonne proprement si la version installée n'est pas celle qu'on connaît
-(évite de corrompre un firmware imprévu).
-
-### 6. Configuration
+### 5. Configuration
 
 Ouvre `http://openqiara.local` (ou l'IP de la caméra) pour appairer les
 capteurs et configurer MQTT.
@@ -313,9 +279,9 @@ go test ./...
 
 OpenQiara est un **overlay** sur le rootfs stock de la caméra. Il **ne**
 re-flashe **pas** la caméra, ne remplace pas le kernel, et ne touche pas au
-firmware du MCU. Il se lance à côté (ou à la place) du daemon original
-`fbxhome`, parle au même multiplexeur UART `charmux` que le firmware d'origine,
-et utilise le même protocole DomusRF avec les mêmes capteurs.
+firmware du MCU. Il se lance à la place du daemon original
+`fbxhome` (arrêté au boot), parle au même multiplexeur UART `charmux` que le
+firmware d'origine, et utilise le même protocole DomusRF avec les mêmes capteurs.
 
 Ce qui reste du constructeur :
 
