@@ -61,8 +61,8 @@ type AlarmConfig struct {
 	AlarmoStateTopic string `json:"alarmo_state_topic,omitempty"`
 
 	// SirenSounds controls which sounds the physical siren plays.
-	// "all"  (default) = arm beep + disarm beep + triggered wail
-	// "alarm_only"     = only triggered wail (no arm/disarm beeps)
+	// "all"  (default) = beeps during the arming and entry delays + wail
+	// "alarm_only"     = only the wail
 	// "none"           = completely silent (siren disabled)
 	SirenSounds string `json:"siren_sounds"`
 

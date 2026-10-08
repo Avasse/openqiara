@@ -80,6 +80,12 @@ Commandes via l'API : `POST /api/v1/commands/siren/test` (bip de test discret)
 et `POST /api/v1/commands/siren/alarm_test` (wail d'intrusion). La durée du
 wail part dans la trame radio et la sirène s'arrête d'elle-même.
 
+Pendant les délais de la centrale (armement, puis entrée après un
+déclenchement), openqiarad fait biper la sirène : un bip discret de
+250 ms toutes les 5 s à l'armement, toutes les 2 s au délai d'entrée.
+openqiarad porte les délais, en mode `standalone` comme avec Alarmo ; la
+sirène ne fait que jouer les sons. `siren_sounds: alarm_only` les coupe.
+
 ### SRN — Recovery après débranchement physique
 
 Si tu débranches puis rebranches physiquement la SRN et qu'elle reste muette

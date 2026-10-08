@@ -215,6 +215,15 @@ func TestRadioSiren(t *testing.T) {
 	if err := c.TriggerSirenAlarm(context.Background(), 23, 0); err == nil {
 		t.Error("a door was made to wail")
 	}
+	// A beep: the discreet test sound for a quarter second.
+	if err := c.BeepSiren(context.Background(), 29); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range [][]byte{sirenWake, {0x55, 0x05, 0x01, 0x0a, 0x01}} {
+		if f := mcu.sent(t); !bytes.Equal(f.Payload, want) {
+			t.Errorf("beep frame = %x, want %x", f.Payload, want)
+		}
+	}
 }
 
 // silent lets the sensors go silent for d, as the minute tick sees it.

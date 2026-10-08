@@ -2526,7 +2526,7 @@
               "alarm_only",
               "none"
             ],
-            "description": "Quels sons la sirène émet.\n\n- `all` — bips d'armement et de désarmement, plus l'alarme\n- `alarm_only` — uniquement l'alarme\n- `none` — silencieuse",
+            "description": "Quels sons la sirène émet.\n\n- `all` — bips pendant les délais d'armement et d'entrée, plus l'alarme\n- `alarm_only` — uniquement l'alarme\n- `none` — silencieuse",
             "default": "all"
           },
           "arming_delay_seconds": {

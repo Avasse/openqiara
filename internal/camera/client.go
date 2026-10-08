@@ -39,6 +39,9 @@ type Client interface {
 	// TriggerSiren plays the siren's discreet test sound.
 	TriggerSiren(ctx context.Context, sensorID int) error
 
+	// BeepSiren plays one short, discreet beep.
+	BeepSiren(ctx context.Context, sensorID int) error
+
 	// TriggerSirenAlarm fires the full-power wail for duration.
 	TriggerSirenAlarm(ctx context.Context, sensorID int, duration time.Duration) error
 

@@ -727,6 +727,12 @@ func (c *RadioClient) TriggerSiren(ctx context.Context, id int) error {
 	return c.play(ctx, id, sirenSound(10, 10*time.Second))
 }
 
+// BeepSiren plays the test sound for a quarter second, the shortest the
+// duration byte allows: the beep of the alarm's delays.
+func (c *RadioClient) BeepSiren(ctx context.Context, id int) error {
+	return c.play(ctx, id, sirenSound(10, time.Second/4))
+}
+
 // TriggerSirenAlarm starts the full-power wail, for duration (10 s if
 // unset). It returns at once: the siren stops by
 // itself.

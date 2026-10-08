@@ -38,6 +38,7 @@ func (c *stubCamera) StopPairing(context.Context, int) error  { return nil }
 func (c *stubCamera) DeleteSensor(context.Context, int) error { return nil }
 func (c *stubCamera) SendPKT(context.Context, []byte) error   { return nil }
 func (c *stubCamera) TriggerSiren(context.Context, int) error { return nil }
+func (c *stubCamera) BeepSiren(context.Context, int) error    { return nil }
 func (c *stubCamera) TriggerSirenAlarm(context.Context, int, time.Duration) error {
 	return nil
 }
