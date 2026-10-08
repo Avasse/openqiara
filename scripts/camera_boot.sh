@@ -101,10 +101,8 @@ rotate_log() {
 }
 rotate_log /data/openqiarad.log
 rotate_log /data/hlcamd.log
-# fbxhome.log grows unbounded (~5 MB observed) and dnsmasq/boot_debug pile up
-# on the tiny /data partition (20 MB) — cap them too, or the SD fills and the
-# camera fails to boot (reported on the forum).
-rotate_log /data/fbxhome.log
+# dnsmasq/boot_debug pile up on the tiny /data partition (20 MB) — cap them
+# too, or the SD fills and the camera fails to boot (reported on the forum).
 rotate_log /data/dnsmasq.log
 rotate_log /data/boot_debug.log
 
@@ -125,36 +123,13 @@ done
 # Wait for charmux and MCU to be ready
 sleep 10
 
-# Apply the fbxhome KPD->HlAlarm decoupling patch if present.
-# Without this patch, fbxhome drives its own internal alarm state machine
-# on KPD_DAY_ALARM / KPD_NIGHT_ALARM, which double-pilots the SRN when
-# openqiarad is in `alarm.mode = alarmo` (and can conflict with HA Alarmo's
-# own rules). The patch NOPs 2 `blx r4` instructions in
-# HLKpd::event_slot_type::virtual_8 at offsets 0xa4a84 and 0xa4aec so the
-# KPD events still get logged (openqiarad's tail still sees them) but no
-# longer propagate to HlAlarm. See docs/protocol.md "fbxhome patch".
-if [ -f /data/fbxhome.patched ]; then
-    if ! cmp -s /data/fbxhome.patched /usr/bin/fbxhome 2>/dev/null; then
-        echo "[boot.sh] Applying fbxhome KPD->HlAlarm decoupling patch"
-        mount -o remount,rw /
-        cp /data/fbxhome.patched /usr/bin/fbxhome
-        chmod 755 /usr/bin/fbxhome
-        mount -o remount,ro /
-    fi
-fi
-
-# Ensure fbxhome runs. We bypass fbxupstart's launcher because we need
-# the `-U 1` flag (use local /data/update_manifest.json) — without it,
-# fbxhome attempts a cloud fetch that fails silently post-Free shutdown
-# and never sets target_fw_fnv on paired nodes (= no bytecode push,
-# sensor stays in "paired but inert" state). With -U 1 fbxhome loads
-# the manifest from /etc/hl/update_manifest.json (symlinked into /data)
-# and uses the bytecode .bin files cached in /data/firmwares/.
+# fbxhome, the vendor's radio daemon, must not run: openqiarad is the
+# radio gateway and needs the charmux ports fbxhome would hold. fbxupstart
+# may have started it already. Its state (/data/fbxhome.xml.*) stays:
+# openqiarad imports the paired sensors from it at its first start.
 fbxupstartctl stop fbxhome 2>/dev/null
-sleep 2
-EUPID=$(cat /tmp/key.eupid 2>/dev/null || echo "0000000000000000")
-nohup /usr/bin/fbxhome -A /dev/ttyS2 -C /data/fbxhome.xml -e "$EUPID" -U 1 \
-    >> /data/fbxhome.log 2>&1 &
+killall fbxhome 2>/dev/null
+rm -f /data/fbxhome.log /data/fbxhome.log.old
 # Stop dnsmasq vendor, then start our own with two key tweaks:
 #
 # 1. Bind to :53 only (NOT :5353): the stock dnsmasq grabs :5353 too, which
@@ -240,13 +215,13 @@ if [ -f /data/ota_pending ]; then
 fi
 
 # Start openqiarad on port 80 (default HTTP, so http://openqiara.local works
-# directly without a port in the URL). mode=fbxhome makes us a proxy:
-# fbxhome handles the radio, we publish to HA/MQTT/HomeKit.
+# directly without a port in the URL). openqiarad is the radio gateway:
+# it serves the sensors and publishes to HA/MQTT/HomeKit.
 #
 # -log active la rotation interne lumberjack (1 MB par fichier, 3 backups
 # = ~4 MB max). Le watchdog ci-dessous reste comme filet de sécurité au
 # cas où lumberjack se planterait (cap dur à 4 MB par fichier).
-/data/openqiarad -web :80 -mode fbxhome -log /data/openqiarad.log >/dev/null 2>&1 &
+/data/openqiarad -web :80 -log /data/openqiarad.log >/dev/null 2>&1 &
 
 # Stop the vendor watchdog from rebooting the camera every ~12 h 06.
 # watchdog_mcu keeps the MCU's 15-minute hardware watchdog fed only while
@@ -289,14 +264,14 @@ fi
                 : > "$f"
             fi
         done
-        # boot_debug.log (native SIGHUP flood) and fbxhome.log are NOT ours
-        # and their writers keep a raw fd on the inode: verified 2026-09-13
-        # that after `mv` they keep appending to the renamed file at the old
-        # offset, and after truncate they punch a sparse hole. NEITHER is
-        # safe at runtime, so we leave them to the boot-time rotate_log pass
-        # (their writers get a fresh fd only at boot). We just kill the *.old
-        # they leave behind, which is dead weight that alone can fill /data.
-        rm -f /data/boot_debug.log.old /data/fbxhome.log.old /data/dnsmasq.log.old 2>/dev/null
+        # boot_debug.log (native SIGHUP flood) is NOT ours and its writer
+        # keeps a raw fd on the inode: verified 2026-09-13 that after `mv` it
+        # keeps appending to the renamed file at the old offset, and after
+        # truncate it punches a sparse hole. Neither is safe at runtime, so
+        # we leave it to the boot-time rotate_log pass (its writer gets a
+        # fresh fd only at boot). We just kill the *.old left behind, dead
+        # weight that alone can fill /data.
+        rm -f /data/boot_debug.log.old /data/dnsmasq.log.old 2>/dev/null
     done
 ) &
 

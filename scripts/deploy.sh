@@ -9,9 +9,7 @@ set -euo pipefail
 
 CAM_HOST="${CAM_HOST:?CAM_HOST required (camera IP)}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
-# Production mode by default. -mode charmux makes openqiarad the radio
-# gateway: stop fbxhome first, it holds the charmux ports.
-ARGS="${ARGS:--web :80 -mode fbxhome}"
+ARGS="${ARGS:--web :80}"
 REMOTE_BIN="/data/openqiarad"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -24,7 +22,7 @@ GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" -o bin/openqia
 echo "    Build OK ($(du -h bin/openqiarad | cut -f1))"
 
 echo "==> Killing old process on $CAM_HOST..."
-$SSH_CMD 'killall openqiarad 2>/dev/null; true'
+$SSH_CMD 'killall openqiarad 2>/dev/null; fbxupstartctl stop fbxhome 2>/dev/null; killall fbxhome 2>/dev/null; true'
 
 echo "==> Waiting 3s for ports to free..."
 sleep 3

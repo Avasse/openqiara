@@ -161,10 +161,6 @@ a { color: var(--primary); }
           <option value="KPD">KPD - Clavier</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Fingerprint <span style="color:var(--text-muted);font-size:12px">16 hex chars du QR code au dos du capteur</span></label>
-        <input type="text" id="pair-fingerprint" placeholder="cca878cd4128e306" maxlength="16" pattern="[0-9a-fA-F]{16}">
-      </div>
       <button class="btn btn-primary" id="pair-start">Démarrer l'appairage</button>
       <button class="btn btn-danger" id="pair-cancel" style="display:none">Annuler</button>
       <div id="pair-msg"></div>
@@ -239,21 +235,6 @@ a { color: var(--primary); }
         <label>Durée du wail (s) <span style="color:var(--text-muted);font-size:12px">durée du burst d'alarme avant arrêt</span></label>
         <input type="number" id="cfg-wail-duration" min="1" max="60" step="1">
       </div>
-      <div id="cfg-fbxhome-timings" style="display:none">
-        <div class="form-group">
-          <label>Délai d'armement (s) <span style="color:var(--text-muted);font-size:12px">temps avant que la surveillance démarre après ARM</span></label>
-          <input type="number" id="cfg-fbx-armed" min="0" max="600" step="1">
-        </div>
-        <div class="form-group">
-          <label>Délai de pré-alarme (s) <span style="color:var(--text-muted);font-size:12px">temps après détection (si capteur en mode timed) avant que la sirène se déclenche</span></label>
-          <input type="number" id="cfg-fbx-alert" min="0" max="600" step="1">
-        </div>
-        <div class="form-group">
-          <label>Durée max du wail (s) <span style="color:var(--text-muted);font-size:12px">durée avant arrêt automatique du wail</span></label>
-          <input type="number" id="cfg-fbx-wail" min="10" max="3600" step="1">
-        </div>
-      </div>
-
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
 
       <!-- Avancé (plié par défaut) -->
@@ -502,18 +483,11 @@ let pairingTimer = null;
 
 document.getElementById('pair-start').addEventListener('click', async () => {
   const type = document.getElementById('pair-type').value;
-  const fingerprint = document.getElementById('pair-fingerprint').value.trim().toLowerCase();
   const msg = document.getElementById('pair-msg');
   msg.className = 'msg info';
-  if (fingerprint && !/^[0-9a-f]{16}$/.test(fingerprint)) {
-    msg.className = 'msg error';
-    msg.textContent = 'Fingerprint invalide (16 caractères hex attendus)';
-    return;
-  }
   msg.textContent = 'Démarrage...';
   try {
     const body = {type};
-    if (fingerprint) body.fingerprint = fingerprint;
     const r = await fetch(V1 + '/sensors/pair', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -677,21 +651,6 @@ async function setNightAllowed(id, allowed) {
   }
 }
 
-async function setSensorFlag(id, key, val) {
-  try {
-    const r = await fetch(V1 + '/sensors/' + id, {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({[key]: val})
-    });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-  } catch (e) {
-    alert('Erreur : ' + e.message);
-    fetchSensors();
-  }
-}
-
 async function setAlarm(action) {
   const msg = document.getElementById('alarm-msg');
   msg.textContent = '';
@@ -829,43 +788,12 @@ async function loadConfig() {
       document.getElementById('cfg-wail-duration').value = d.alarm.wail_duration_seconds ?? 3;
       window.currentAlarmMode = mode;
     }
-    // Camera mode: fbxhome owns alarm timings; show fbxhome-specific
-    // inputs in that mode, charmux-style inputs otherwise.
-    //
-    // Logique d'affichage :
-    //   - Les délais "engine local" (charmux-timings) sont affichés quand
-    //     alarm.mode == standalone : c'est l'engine openqiara qui décide,
-    //     peu importe le backend caméra (charmux ou fbxhome bridge).
-    //   - Les délais "fbxhome" (fbxhome-timings) sont affichés quand
-    //     camera_mode == fbxhome ET alarm.mode == alarmo : Alarmo HA pilote,
-    //     openqiara forward, mais fbxhome a ses propres timers radio.
-    const camMode = d.camera_mode || 'fbxhome';
+    // Délais de l'engine local : seulement en standalone. En alarmo, HA
+    // Alarmo pilote l'alarme et ces délais n'ont aucun effet.
     const alarmMode = (d.alarm && d.alarm.mode) || 'standalone';
-    window.currentCameraMode = camMode;
     window.currentAlarmMode = alarmMode;
     const charmuxTimings = document.getElementById('cfg-charmux-timings');
-    const fbxTimings = document.getElementById('cfg-fbxhome-timings');
-    if (charmuxTimings && fbxTimings) {
-      // alarmo = HA Alarmo pilote l'alarme : ni les délais engine local,
-      // ni les timeouts fbxhome n'ont d'effet. On masque les deux.
-      // En standalone : délais de l'engine local Go.
-      // En alarmo non-supporté ici : ni l'un ni l'autre.
-      const showLocal = alarmMode === 'standalone';
-      charmuxTimings.style.display = showLocal ? '' : 'none';
-      fbxTimings.style.display = 'none';
-    }
-    // Load fbxhome timings on-demand (separate endpoint reading the XML).
-    if (camMode === 'fbxhome') {
-      try {
-        const fr = await fetch(V1 + '/config/fbxhome_alarm');
-        if (fr.ok) {
-          const ft = await fr.json();
-          document.getElementById('cfg-fbx-armed').value = ft.timeout_before_armed ?? 30;
-          document.getElementById('cfg-fbx-alert').value = ft.timeout_before_alert ?? 30;
-          document.getElementById('cfg-fbx-wail').value = ft.timeout_alert ?? 300;
-        }
-      } catch (e) { /* ignore */ }
-    }
+    if (charmuxTimings) charmuxTimings.style.display = alarmMode === 'standalone' ? '' : 'none';
     // Web
     if (d.web) {
       document.getElementById('cfg-web-enabled').value = d.web.enabled ? 'true' : 'false';
@@ -885,9 +813,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.currentAlarmMode = m;
       const showLocal = m === 'standalone';
       const cTim = document.getElementById('cfg-charmux-timings');
-      const fTim = document.getElementById('cfg-fbxhome-timings');
       if (cTim) cTim.style.display = showLocal ? '' : 'none';
-      if (fTim) fTim.style.display = 'none';
       // Re-render la liste des capteurs si elle est déjà affichée
       // (les flags par capteur dépendent du mode).
       if (window.lastSensors) renderSensors(window.lastSensors);
@@ -959,21 +885,6 @@ document.getElementById('cfg-save-all').addEventListener('click', async () => {
     })
   }));
 
-  // fbxhome timings (uniquement en mode camera=fbxhome ET alarm=alarmo —
-  // ces délais ne sont pas pertinents en standalone, l'engine local pilote).
-  const camMode = window.currentCameraMode || 'fbxhome';
-  const alarmMode = window.currentAlarmMode || 'standalone';
-  if (camMode === 'fbxhome' && alarmMode !== 'standalone') {
-    calls.push(fetch(V1 + '/config/fbxhome_alarm', {
-      method: 'PUT', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        timeout_before_armed: parseInt(document.getElementById('cfg-fbx-armed').value, 10),
-        timeout_before_alert: parseInt(document.getElementById('cfg-fbx-alert').value, 10),
-        timeout_alert: parseInt(document.getElementById('cfg-fbx-wail').value, 10),
-      })
-    }));
-  }
-
   // Web
   calls.push(fetch(V1 + '/config/web', {
     method: 'PUT', headers: {'Content-Type': 'application/json'},
@@ -1002,7 +913,7 @@ document.getElementById('cfg-save-all').addEventListener('click', async () => {
 
 // --- Init ---
 // loadConfig() pose window.currentAlarmMode ; renderSensors() en dépend pour
-// masquer les flags fbxhome par capteur en mode alarmo. On charge donc la
+// masquer les flags par capteur en mode alarmo. On charge donc la
 // config AVANT le premier fetchSensors(), sinon la course fait apparaître les
 // flags à tort en mode alarmo (fallback 'standalone' quand le mode est encore
 // undefined).
@@ -1238,27 +1149,14 @@ function renderSensors(sensors) {
   // changement de mode alarme (les flags par capteur disparaissent
   // en mode alarmo).
   window.lastSensors = sensors;
-  // En mode alarmo, HA Alarmo décide quels capteurs déclenchent quoi
-  // — nos flags par capteur (day_alarm, night_allowed, etc.) sont
-  // décoratifs au mieux. On les masque pour ne pas laisser croire
-  // qu'ils ont un effet.
-  // En mode standalone :
-  //   - charmux : legacy night_allowed (capteur ignoré en mode nuit)
-  //   - fbxhome : day_alarm / night_alarm / day_timed / night_timed
-  //     (poussés à fbxhome via ExportLink)
+  // En mode alarmo, HA Alarmo décide quels capteurs déclenchent quoi :
+  // night_allowed n'y a aucun effet, on le masque. En standalone, il dit
+  // si le capteur est ignoré quand l'alarme est armée pour la nuit.
   const standalone = (window.currentAlarmMode || 'standalone') === 'standalone';
-  const fbxhome = (window.currentCameraMode || 'fbxhome') === 'fbxhome';
   list.innerHTML = sensors.map(s => {
     const isSensor = s.type !== 'KPD' && s.type !== 'SRN';
-    const showNightAllowed = standalone && !fbxhome && isSensor;
-    const showFbxFlags = standalone && fbxhome && isSensor;
+    const showNightAllowed = standalone && isSensor;
     const nightChecked = s.night_allowed ? 'checked' : '';
-    // *bool from backend: undefined = inherit fbxhome default (true). Treat
-    // missing or true as checked.
-    const dAlarm = s.day_alarm !== false ? 'checked' : '';
-    const nAlarm = s.night_alarm !== false ? 'checked' : '';
-    const dTimed = s.day_timed !== false ? 'checked' : '';
-    const nTimed = s.night_timed !== false ? 'checked' : '';
     const safeLabel = escapeHTML(s.label || (s.type + ' #' + s.id));
     const safeLabelJS = escapeJSString(s.label || '');
     return `
@@ -1285,25 +1183,6 @@ function renderSensors(sensors) {
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Si coché, ce capteur ne déclenche pas l'alarme en mode Nuit">
                 <input type="checkbox" ${nightChecked} onchange="setNightAllowed(${s.id}, this.checked)">
                 <span>🌙 Autoriser en mode nuit</span>
-              </label>
-            </div>` : ''}
-            ${showFbxFlags ? `
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px">
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Déclenche l'alarme en mode Jour (armed_away)">
-                <input type="checkbox" ${dAlarm} onchange="setSensorFlag(${s.id}, 'day_alarm', this.checked)">
-                <span>☀️ Alarme Jour</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Déclenche l'alarme en mode Nuit (armed_night)">
-                <input type="checkbox" ${nAlarm} onchange="setSensorFlag(${s.id}, 'night_alarm', this.checked)">
-                <span>🌙 Alarme Nuit</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Applique le délai d'entrée/sortie en mode Jour (sinon instantané)">
-                <input type="checkbox" ${dTimed} onchange="setSensorFlag(${s.id}, 'day_timed', this.checked)">
-                <span>⏱ Délai Jour</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Applique le délai d'entrée/sortie en mode Nuit">
-                <input type="checkbox" ${nTimed} onchange="setSensorFlag(${s.id}, 'night_timed', this.checked)">
-                <span>⏱ Délai Nuit</span>
               </label>
             </div>` : ''}
           </div>
