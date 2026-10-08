@@ -123,10 +123,10 @@ func buildExtraDiscoveryTopics(prefix string, sensor camera.Sensor) []struct {
 	}{
 		Topic: fmt.Sprintf("homeassistant/sensor/openqiara_%d_battery/config", sensor.ID),
 		Payload: discoveryPayload{
-			Name:                name + " Batterie",
-			UniqueID:            fmt.Sprintf("openqiara_%s_%d_battery", typeLower, sensor.ID),
-			DeviceClass:         "battery",
-			StateTopic:          st,
+			Name:        name + " Batterie",
+			UniqueID:    fmt.Sprintf("openqiara_%s_%d_battery", typeLower, sensor.ID),
+			DeviceClass: "battery",
+			StateTopic:  st,
 			// PIR, DWS and keypads send 255, a level no sensor measures: unknown.
 			ValueTemplate:       "{{ value_json.battery if value_json.battery <= 100 else None }}",
 			JSONAttributesTopic: st,
@@ -193,13 +193,13 @@ func IVDetectionDiscoveryPayload(prefix, kind string) (string, []byte) {
 	}
 	topic := "homeassistant/binary_sensor/openqiara_iv_" + kind + "/config"
 	payload := discoveryPayload{
-		Name:          displayName,
-		UniqueID:      "openqiara_iv_" + kind,
-		DeviceClass:   deviceClass,
-		StateTopic:    prefix + "/iv/" + kind + "/state",
-		ValueTemplate: "{{ value_json.detected | lower }}",
-		PayloadOn:     "true",
-		PayloadOff:    "false",
+		Name:                   displayName,
+		UniqueID:               "openqiara_iv_" + kind,
+		DeviceClass:            deviceClass,
+		StateTopic:             prefix + "/iv/" + kind + "/state",
+		ValueTemplate:          "{{ value_json.detected | lower }}",
+		PayloadOn:              "true",
+		PayloadOff:             "false",
 		JSONAttributesTopic:    prefix + "/iv/" + kind + "/state",
 		JSONAttributesTemplate: "{\"confidence\": {{ value_json.confidence }}, \"object_id\": \"{{ value_json.object_id }}\"}",
 		Device: haDevice{
