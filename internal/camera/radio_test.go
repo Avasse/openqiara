@@ -235,11 +235,17 @@ func TestRadioReachability(t *testing.T) {
 }
 
 // TestRadioSensorsNotServed: a sensor without a radio address, or a keypad
-// whose code is not valid, is not served and shows unreachable; the
-// keypad is not left to disarm with its off button alone.
+// whose code is not valid or not set, is not served and shows
+// unreachable; the keypad is not left to disarm with its off button alone.
 func TestRadioSensorsNotServed(t *testing.T) {
-	badKPD := kpd
-	badKPD.KPDCode = "12a4"
+	for _, code := range []string{"12a4", ""} {
+		badKPD := kpd
+		badKPD.KPDCode = code
+		testRadioSensorsNotServed(t, badKPD)
+	}
+}
+
+func testRadioSensorsNotServed(t *testing.T, badKPD config.SensorEntry) {
 	c, mcu, _ := newRadio(t, badKPD, config.SensorEntry{ID: 40, Type: "PIR"})
 	mcu.rx(fromSensor(2, 3, 0x01, 0x55, 0x09))
 	mcu.quiet(t)

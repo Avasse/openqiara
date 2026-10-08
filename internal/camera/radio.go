@@ -212,7 +212,8 @@ func (c *RadioClient) reload() {
 			s.Reachable = false
 		} else {
 			n := radio.Node{Addr: se.Radio.Addr, Model: model, SystemIndex: se.Radio.SystemIndex}
-			if model == radio.KPD && se.KPDCode != "" {
+			if model == radio.KPD {
+				// An empty code is not valid: the engine refuses it.
 				n.PINs = []string{se.KPDCode}
 			}
 			nodes[se.ID] = n

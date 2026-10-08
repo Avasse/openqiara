@@ -72,7 +72,7 @@ Format PKT :
 - `55 01 ... 00 02` = arm night (KPD_NIGHT_ALARM)
 - `55 01 ... 80 00 10 32 00 00` = disarm (KPD_ALARM_OFF, code validé)
 
-**Programmation des codes** : ✅ résolu 2026-05-13 (RE de fbxhome : `endpoints_write ep_name="pwd"`, qui écrivait `<Code valid="true" password="NNNN" />` dans `/data/fbxhome.xml` puis poussait le code au KPD via bytecode au prochain heartbeat). Côté openqiara : `POST /api/codes`.
+**Programmation des codes** : ✅ résolu 2026-05-13 (RE de fbxhome : `endpoints_write ep_name="pwd"`, qui écrivait `<Code valid="true" password="NNNN" />` dans `/data/fbxhome.xml` puis poussait le code au KPD au prochain heartbeat). openqiarad fait de même sans fbxhome : `PUT /api/v1/kpd/code` enregistre le code dans sa config, et il part au prochain réveil du clavier. Un clavier sans code n'est pas servi (sa touche OFF seule désarmerait).
 
 ### SRN — Sirène
 
