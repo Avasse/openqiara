@@ -188,7 +188,7 @@ sleep 2
 EUPID=$(cat /tmp/key.eupid 2>/dev/null || echo "")
 MAC=$(cat /sys/class/net/ssv0/address 2>/dev/null || echo "")
 if [ -n "$EUPID" ] && [ -n "$MAC" ]; then
-    /usr/bin/hlcamd -d 75 --save-vision-samples --iv-detection 1 \
+    /usr/bin/hlcamd -d 75 --iv-detection 1 \
         --flip-flop-detect 1 --eupid "$EUPID" --mac "$MAC" --use-h264 \
         >> /data/hlcamd.log 2>&1 &
 fi
