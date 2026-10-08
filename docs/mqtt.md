@@ -80,13 +80,13 @@ Payload: {
 }
 ```
 
-State : `{"open": true, "battery": 85, "temperature": 21.5, "reachable": true}`
+State : `{"open": true, "battery": 255, "reachable": true}`
 
 ### PIR (binary_sensor)
 
 ```
 Topic:   homeassistant/binary_sensor/openqiara_<ID>/config
-State:   {"motion": true, "battery": 72, "temperature": 20.0, "reachable": true}
+State:   {"motion": true, "battery": 255, "reachable": true}
 ```
 
 ### SRN (siren)
@@ -124,11 +124,16 @@ Quand `alarm.mode = "alarmo"` :
 
 ### Entités supplémentaires
 
-Pour chaque capteur, des entités batterie et température :
+Pour chaque capteur, une entité batterie :
 ```
 homeassistant/sensor/openqiara_<ID>_battery/config
-homeassistant/sensor/openqiara_<ID>_temperature/config
 ```
+
+Seule la sirène mesure sa pile ; PIR, DWS et clavier envoient 255, que
+l'entité affiche comme inconnu (la valeur brute reste dans les attributs).
+Il n'y a pas d'entité température : aucun capteur n'en envoie par radio.
+openqiarad efface l'ancienne entité `openqiara_<ID>_temperature` au
+démarrage.
 
 ## Sync bidirectionnelle
 

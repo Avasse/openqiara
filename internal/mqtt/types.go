@@ -29,7 +29,6 @@ type haDevice struct {
 type dwsState struct {
 	Open        bool    `json:"open"`
 	Battery     int     `json:"battery"`
-	Temperature float64 `json:"temperature"`
 	Reachable   bool    `json:"reachable"`
 }
 
@@ -37,7 +36,6 @@ type dwsState struct {
 type pirState struct {
 	Motion      bool    `json:"motion"`
 	Battery     int     `json:"battery"`
-	Temperature float64 `json:"temperature"`
 	Reachable   bool    `json:"reachable"`
 }
 

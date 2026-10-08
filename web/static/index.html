@@ -1174,8 +1174,7 @@ function renderSensors(sensors) {
               </div>
             </div>
             <div class="card-meta">
-              ${s.battery > 0 ? `<span>Batterie: ${s.battery}%</span>` : ''}
-              ${s.temperature > 0 ? `<span>Température: ${(s.temperature / 10).toFixed(1)}°C</span>` : ''}
+              ${s.battery > 0 && s.battery <= 100 ? `<span>Batterie: ${s.battery}%</span>` : ''}
               <span>${s.reachable ? 'Joignable' : 'Injoignable'}</span>
             </div>
             ${showNightAllowed ? `

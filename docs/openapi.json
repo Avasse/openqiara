@@ -139,7 +139,6 @@
                         "type_name": "Node.DomusNode.HLKpd",
                         "item_id": "f5129f624dc648fa",
                         "battery": 100,
-                        "temperature": 200,
                         "reachable": true,
                         "open": false,
                         "motion": false,
@@ -154,7 +153,6 @@
                         "type_name": "Node.DomusNode.HlDws",
                         "item_id": "562e741c4f5bd5e6",
                         "battery": 98,
-                        "temperature": 205,
                         "reachable": true,
                         "open": true,
                         "motion": false,
@@ -419,7 +417,6 @@
                         "type_name": "Node.DomusNode.HlDws",
                         "item_id": "562e741c4f5bd5e6",
                         "battery": 100,
-                        "temperature": 200,
                         "reachable": true,
                         "open": false,
                         "motion": false,
@@ -2140,7 +2137,6 @@
           "type_name",
           "item_id",
           "battery",
-          "temperature",
           "reachable",
           "open",
           "motion",
@@ -2174,17 +2170,10 @@
           "battery": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 100,
-            "description": "Niveau de batterie en pourcent.",
+            "maximum": 255,
+            "description": "Niveau de pile envoyé par le capteur : un pourcentage pour la sirène, 255 (non mesuré) pour PIR, DWS et clavier.",
             "examples": [
               100
-            ]
-          },
-          "temperature": {
-            "type": "integer",
-            "description": "Valeur brute du firmware. La conversion en °C n'est pas connue ; ne pas diviser par 10 sans vérifier.",
-            "examples": [
-              200
             ]
           },
           "reachable": {

@@ -90,7 +90,7 @@ func TestBuildDiscoveryPayload_CustomPrefix(t *testing.T) {
 }
 
 func TestMarshalState_DWS(t *testing.T) {
-	s := camera.Sensor{ID: 33, Type: "DWS", Open: true, Battery: 85, Temperature: 215, Reachable: true}
+	s := camera.Sensor{ID: 33, Type: "DWS", Open: true, Battery: 85, Reachable: true}
 	data, err := marshalState(s)
 	if err != nil {
 		t.Fatal(err)
@@ -106,16 +106,13 @@ func TestMarshalState_DWS(t *testing.T) {
 	if got.Battery != 85 {
 		t.Errorf("battery = %d, want 85", got.Battery)
 	}
-	if got.Temperature != 21.5 {
-		t.Errorf("temperature = %f, want 21.5", got.Temperature)
-	}
 	if !got.Reachable {
 		t.Error("expected reachable=true")
 	}
 }
 
 func TestMarshalState_PIR(t *testing.T) {
-	s := camera.Sensor{ID: 7, Type: "PIR", Motion: true, Battery: 50, Temperature: 200, Reachable: true}
+	s := camera.Sensor{ID: 7, Type: "PIR", Motion: true, Battery: 50, Reachable: true}
 	data, err := marshalState(s)
 	if err != nil {
 		t.Fatal(err)
@@ -127,9 +124,6 @@ func TestMarshalState_PIR(t *testing.T) {
 	}
 	if !got.Motion {
 		t.Error("expected motion=true")
-	}
-	if got.Temperature != 20.0 {
-		t.Errorf("temperature = %f, want 20.0", got.Temperature)
 	}
 }
 

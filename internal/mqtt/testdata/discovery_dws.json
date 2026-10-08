@@ -7,7 +7,7 @@
   "payload_on": "true",
   "payload_off": "false",
   "json_attributes_topic": "openqiara/sensor/14/state",
-  "json_attributes_template": "{\"battery\": {{ value_json.battery }}, \"temperature\": {{ value_json.temperature }}, \"reachable\": {{ value_json.reachable | lower }}}",
+  "json_attributes_template": "{\"battery\": {{ value_json.battery }}, \"reachable\": {{ value_json.reachable | lower }}}",
   "device": {
     "identifiers": [
       "openqiara_14"

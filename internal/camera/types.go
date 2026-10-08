@@ -7,7 +7,6 @@ type Sensor struct {
 	TypeName    string `json:"type_name"`   // e.g. "Node.DomusNode.HlDws"
 	ItemID      string `json:"item_id"`     // hardware identifier
 	Battery     int    `json:"battery"`     // percentage
-	Temperature int    `json:"temperature"` // value from API (divide by 10 for Celsius)
 	Reachable   bool   `json:"reachable"`
 	Open        bool   `json:"open"`   // DWS: door/window open
 	Motion      bool   `json:"motion"` // PIR: motion detected
