@@ -124,6 +124,11 @@ Quand `alarm.mode = "alarmo"` :
 
 ### Entités supplémentaires
 
+`reachable` passe à `false` quand le capteur se tait trop longtemps :
+30 min pour la sirène (keepalive toutes les 10 min), 26 h pour les autres
+(heartbeat toutes les ~12 h). Une porte dont la pile est morte est donc
+signalée au plus tard le lendemain.
+
 Pour chaque capteur, une entité batterie :
 ```
 homeassistant/sensor/openqiara_<ID>_battery/config

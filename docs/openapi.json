@@ -2178,7 +2178,7 @@
           },
           "reachable": {
             "type": "boolean",
-            "description": "Le capteur a répondu récemment."
+            "description": "Le capteur a émis récemment : dans les 30 dernières minutes pour la sirène (keepalive toutes les 10 min), dans les 26 dernières heures pour les autres (heartbeat toutes les ~12 h)."
           },
           "open": {
             "type": "boolean",

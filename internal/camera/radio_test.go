@@ -217,16 +217,37 @@ func TestRadioSiren(t *testing.T) {
 	}
 }
 
-// TestRadioReachability: a frame the siren never got marks it
-// unreachable, its next frame reachable again.
+// silent lets the sensors go silent for d, as the minute tick sees it.
+func silent(c *RadioClient, d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.markSilent(time.Now().Add(d))
+}
+
+// TestRadioReachability: a frame the siren never got leaves it reachable;
+// silent past its limit it shows unreachable, its next frame reachable
+// again. A door gets far longer, its heartbeat coming every ~12 h.
 func TestRadioReachability(t *testing.T) {
-	c, mcu, _ := newRadio(t, srn)
+	c, mcu, _ := newRadio(t, srn, dws)
 	start := mcu.sent(t)
 	// UNREACHABLE report, as the MCU words it (charmux TestMCUDeliveryReport).
 	report := []byte{0x01, 0x01, 0x00, 0x2a, 0x01, 0x40, 0x00, 0x01, byte(start.Counter)}
 	mcu.events <- charmux.Event{Channel: charmux.ChannelPKT, Data: report}
+	mcu.quiet(t)
+	silent(c, 29*time.Minute)
+	for _, s := range c.CachedSensors() {
+		if !s.Reachable {
+			t.Errorf("sensor %d unreachable before its limit", s.ID)
+		}
+	}
+	silent(c, 31*time.Minute)
 	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.Reachable {
 		t.Errorf("event = %+v, want siren 29 unreachable", ev)
+	}
+	silent(c, 25*time.Hour)
+	silent(c, 27*time.Hour)
+	if ev := nextEvent(t, c); ev.SensorID != 23 || ev.Sensor.Reachable {
+		t.Errorf("event = %+v, want door 23 unreachable", ev)
 	}
 	mcu.rx(charmux.ManagedFrame{GWDst: 1, GWSrc: 6, Counter: 40, Src: 6, Flags: 0x0082, WFlags: 0x01, Payload: []byte{0x55, 0x0e}})
 	if ev := nextEvent(t, c); ev.SensorID != 29 || !ev.Sensor.Reachable {
@@ -460,10 +481,8 @@ func TestRadioBackPublishesFreshState(t *testing.T) {
 	if ev := nextEvent(t, c); !ev.Sensor.Open {
 		t.Fatalf("event = %+v, want open", ev)
 	}
-	ack := mcu.sent(t)
-	// The MCU could not deliver the ack: the door is unreachable.
-	report := []byte{0x01, 0x01, 0x00, 0x2a, 0x01, 0x40, 0x00, 0x01, byte(ack.Counter)}
-	mcu.events <- charmux.Event{Channel: charmux.ChannelPKT, Data: report}
+	mcu.sent(t) // ack
+	silent(c, 27*time.Hour)
 	if ev := nextEvent(t, c); ev.Sensor.Reachable {
 		t.Fatalf("event = %+v, want unreachable", ev)
 	}

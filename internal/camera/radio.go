@@ -56,6 +56,7 @@ type RadioClient struct {
 	nodes   map[int]radio.Node // what the engine serves, by id
 	ids     map[uint32]int     // radio address → id
 	known   map[int]bool       // door or motion state reported since start
+	heard   map[int]time.Time  // last frame from the sensor, or when it began to be served
 	pairing *pairing
 	failed  int // pairings that failed since the last success
 }
@@ -91,6 +92,19 @@ const pairingWindow = 2 * time.Minute
 // feedback_pairing_protocol, docs/re-bypass/09).
 const maxFailedPairings = 3
 
+// silenceLimit is how long a served sensor may stay silent before it shows
+// unreachable. Every sensor sends a status heartbeat every ~12 h 20 (trial
+// logs 2026-10-02 → 10-08), the siren also a keepalive (55 0e) every
+// 10 min: the limits let one beat go missing. Being heard is the only
+// sign of life: a frame the MCU could not deliver says nothing, a
+// sleeping sensor misses them all the time.
+func silenceLimit(m radio.Model) time.Duration {
+	if m == radio.SRN {
+		return 30 * time.Minute
+	}
+	return 26 * time.Hour
+}
+
 var errRadioStopped = errors.New("radio: gateway stopped")
 
 // NewRadioClient returns a client that serves the sensors of store's
@@ -105,6 +119,7 @@ func NewRadioClient(mcu radioMCU, store *config.Store, log *slog.Logger) *RadioC
 		events:      make(chan SensorEvent, 64),
 		done:        make(chan struct{}),
 		known:       make(map[int]bool),
+		heard:       make(map[int]time.Time),
 	}
 }
 
@@ -240,11 +255,19 @@ func (c *RadioClient) reload() {
 			continue
 		}
 		c.ids[n.Addr] = id
+		if _, ok := c.heard[id]; !ok {
+			c.heard[id] = time.Now() // silent from now on, not since the epoch
+		}
 		if siren == 0 && n.Model == radio.SRN {
 			siren = n.Addr // the lowest id, as fbxhome takes the first HlSrn it finds
 		}
 	}
 	c.engine.SetAlarmSiren(siren)
+	for id := range c.heard {
+		if _, ok := nodes[id]; !ok {
+			delete(c.heard, id)
+		}
+	}
 	c.nodes, c.sensors = nodes, sensors
 }
 
@@ -252,10 +275,16 @@ func (c *RadioClient) reload() {
 func (c *RadioClient) run() {
 	defer c.wg.Done()
 	events := c.mcu.Events()
+	tick := time.NewTicker(time.Minute)
+	defer tick.Stop()
 	for {
 		select {
 		case <-c.done:
 			return
+		case now := <-tick.C:
+			c.mu.Lock()
+			c.markSilent(now)
+			c.mu.Unlock()
 		case ev, ok := <-events:
 			if !ok {
 				return
@@ -287,6 +316,7 @@ func (c *RadioClient) receive(data []byte) {
 		s.LastSeen = time.Now().Unix()
 		back, s.Reachable = !s.Reachable, true
 		c.sensors[id] = s
+		c.heard[id] = time.Now()
 	}
 	_ = c.send(c.engine.Receive(time.Now(), *rx))
 	if back {
@@ -294,6 +324,21 @@ func (c *RadioClient) receive(data []byte) {
 		// the state the sensor had when it went missing, and a repeated
 		// open is an intrusion to the alarm.
 		c.emit(c.sensors[id])
+	}
+}
+
+// markSilent shows unreachable the sensors silent past their limit.
+// Called with mu held.
+func (c *RadioClient) markSilent(now time.Time) {
+	for _, id := range slices.Sorted(maps.Keys(c.nodes)) {
+		s := c.sensors[id]
+		if !s.Reachable || now.Sub(c.heard[id]) <= silenceLimit(c.nodes[id].Model) {
+			continue
+		}
+		s.Reachable = false
+		c.sensors[id] = s
+		c.log.Warn("radio: sensor silent, unreachable", "id", id, "type", s.Type, "since", c.heard[id].Format(time.RFC3339))
+		c.emit(s)
 	}
 }
 
@@ -364,7 +409,7 @@ func (c *RadioClient) publish(ev radio.Event) {
 		}
 		s.Battery = ev.Value
 	case radio.DeliveryFailed:
-		s.Reachable = false
+		// Not a sign the sensor is gone (silenceLimit).
 		c.log.Warn("radio: frame not delivered", "id", id, "counter", ev.Value)
 	case radio.NoBytecode:
 		s.Reachable = false
