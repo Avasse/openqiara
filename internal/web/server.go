@@ -1594,7 +1594,7 @@ func (s *Server) handleDebugSirenSeq(w http.ResponseWriter, r *http.Request) {
 
 	rc, ok := s.cam.(*camera.RadioClient)
 	if !ok {
-		writeErr(w, http.StatusServiceUnavailable, "disponible en mode charmux uniquement")
+		writeErr(w, http.StatusServiceUnavailable, "passerelle radio indisponible")
 		return
 	}
 

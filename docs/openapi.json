@@ -160,9 +160,7 @@
                         "motion": false,
                         "last_seen": 1758441500,
                         "label": "Porte d'entrée",
-                        "night_allowed": false,
-                        "day_alarm": true,
-                        "night_alarm": true
+                        "night_allowed": false
                       }
                     ]
                   }
@@ -220,7 +218,7 @@
         },
         "responses": {
           "200": {
-            "description": "Enregistré. En mode `fbxhome`, la propagation des drapeaux vers le firmware est au mieux-effort.",
+            "description": "Enregistré.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1226,99 +1224,6 @@
         }
       }
     },
-    "/api/v1/config/fbxhome_alarm": {
-      "get": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Lire les temporisations du firmware constructeur",
-        "operationId": "getFbxhomeAlarmTimings",
-        "responses": {
-          "200": {
-            "description": "Réglages courants.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FbxhomeAlarmTimings"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Indisponible en mode `charmux`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "Configuration"
-        ],
-        "summary": "Modifier les temporisations du firmware constructeur",
-        "operationId": "updateFbxhomeAlarmTimings",
-        "description": "Seules les valeurs strictement positives sont écrites.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FbxhomeAlarmTimings"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Enregistré.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConfigUpdateResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Indisponible en mode `charmux`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "500": {
-            "description": "Échec de la sauvegarde.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/update": {
       "get": {
         "tags": [
@@ -1588,7 +1493,7 @@
         ],
         "summary": "Tester la sirène",
         "operationId": "commandSirenTest",
-        "description": "Déclenche le son de test de la première sirène appairée.\n\nEn mode `charmux`, c'est un bip court. **En mode `fbxhome` — le mode par défaut — le firmware produit un bref hurlement d'environ une seconde**, bien plus fort qu'un bip. Prévenir avant d'essayer.",
+        "description": "Déclenche le son de test de la première sirène appairée : un son discret de 10 s, qui s'arrête seul.",
         "responses": {
           "200": {
             "description": "Commande acceptée.",
@@ -1633,7 +1538,7 @@
         ],
         "summary": "Déclencher le son d'intrusion",
         "operationId": "commandSirenAlarmTest",
-        "description": "**Bruyant.** Déclenche le son d'alarme réel pour la durée configurée. Prévenir le voisinage avant d'essayer.\n\nEn mode `fbxhome`, la durée est décidée par le firmware.",
+        "description": "**Bruyant.** Déclenche le son d'alarme réel pour la durée configurée (63 s au plus), arrêté par la sirène elle-même. Prévenir le voisinage avant d'essayer.",
         "responses": {
           "200": {
             "description": "Sirène déclenchée.",
@@ -1698,44 +1603,6 @@
           },
           "500": {
             "description": "Le pipeline vidéo n'a pas démarré.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/commands/stream/open": {
-      "post": {
-        "tags": [
-          "Commandes"
-        ],
-        "summary": "Ouvrir un flux SRT",
-        "operationId": "commandStreamOpen",
-        "description": "Alternative à HLS, à plus faible latence. L'URL renvoyée est construite à partir de l'hôte de la requête.",
-        "responses": {
-          "200": {
-            "description": "Paramètres de connexion.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StreamInfo"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "500": {
-            "description": "Le flux n'a pas pu être ouvert.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1922,7 +1789,7 @@
         ],
         "summary": "Envoyer une séquence brute à une sirène",
         "operationId": "commandDebugSirenSequence",
-        "description": "**Réservé au développement.** Monté uniquement si le daemon tourne avec `-debug`, sinon `404`.\n\nAucune validation métier : certaines séquences rendent le MCU radio inutilisable jusqu'à une réinstallation du firmware d'origine.\n\nDisponible uniquement en mode `charmux`.",
+        "description": "**Réservé au développement.** Monté uniquement si le daemon tourne avec `-debug`, sinon `404`.\n\nAucune validation métier : certaines séquences rendent le MCU radio inutilisable jusqu'à une réinstallation du firmware d'origine.",
         "x-dangerous": true,
         "requestBody": {
           "required": true,
@@ -2008,7 +1875,7 @@
             }
           },
           "503": {
-            "description": "Indisponible en mode `fbxhome`.",
+            "description": "Passerelle radio indisponible.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2292,7 +2159,7 @@
           },
           "type_name": {
             "type": "string",
-            "description": "Type interne fbxhome.",
+            "description": "Type interne, vide : conservé pour compatibilité.",
             "examples": [
               "Node.DomusNode.HlDws"
             ]
@@ -2368,22 +2235,6 @@
               "night_allowed": {
                 "type": "boolean",
                 "description": "Capteur ignoré en mode nuit (typiquement un PIR dans une chambre)."
-              },
-              "day_alarm": {
-                "type": "boolean",
-                "description": "Déclenche l'alarme en mode jour. Absent si jamais configuré."
-              },
-              "night_alarm": {
-                "type": "boolean",
-                "description": "Déclenche l'alarme en mode nuit. Absent si jamais configuré."
-              },
-              "day_timed": {
-                "type": "boolean",
-                "description": "Applique le délai d'entrée en mode jour. Absent si jamais configuré."
-              },
-              "night_timed": {
-                "type": "boolean",
-                "description": "Applique le délai d'entrée en mode nuit. Absent si jamais configuré."
               }
             }
           }
@@ -2698,7 +2549,7 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 60,
-            "description": "Durée de la sirène en mode charmux. En mode fbxhome, le firmware décide."
+            "description": "Durée de la sirène, 63 s au plus."
           }
         }
       },
@@ -2748,35 +2599,7 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 60,
-            "description": "Durée de la sirène en mode charmux. En mode fbxhome, le firmware décide."
-          }
-        }
-      },
-      "FbxhomeAlarmTimings": {
-        "type": "object",
-        "description": "Temporisations du moteur d'alarme du firmware constructeur. Disponible uniquement en mode `fbxhome`.",
-        "required": [
-          "timeout_before_armed",
-          "timeout_before_alert",
-          "timeout_alert",
-          "history_when_armed"
-        ],
-        "properties": {
-          "timeout_before_armed": {
-            "type": "integer",
-            "description": "Délai de sortie, en secondes."
-          },
-          "timeout_before_alert": {
-            "type": "integer",
-            "description": "Délai d'entrée, en secondes."
-          },
-          "timeout_alert": {
-            "type": "integer",
-            "description": "Durée de l'alerte, en secondes."
-          },
-          "history_when_armed": {
-            "type": "boolean",
-            "description": "Journaliser les événements capteurs pendant que l'alarme est armée."
+            "description": "Durée de la sirène, 63 s au plus."
           }
         }
       },
@@ -2788,7 +2611,6 @@
           "homekit",
           "admin",
           "web",
-          "camera_mode",
           "alarm"
         ],
         "properties": {
@@ -2803,14 +2625,6 @@
           },
           "web": {
             "$ref": "#/components/schemas/WebConfig"
-          },
-          "camera_mode": {
-            "type": "string",
-            "enum": [
-              "fbxhome",
-              "charmux"
-            ],
-            "description": "Comment le daemon parle au matériel.\n\n- `fbxhome` — via le daemon constructeur (mode testé)\n- `charmux` — pilotage direct du MCU\n\nCertains réglages n'ont de sens que dans l'un des deux."
           },
           "alarm": {
             "$ref": "#/components/schemas/AlarmConfig"
@@ -3004,13 +2818,6 @@
         "properties": {
           "type": {
             "$ref": "#/components/schemas/SensorType"
-          },
-          "fingerprint": {
-            "type": "string",
-            "description": "Empreinte lue sur le QR code du capteur. Les espaces, tirets et majuscules sont tolérés ; seuls les 16 premiers caractères hexadécimaux comptent. Ignorée en mode `charmux` : le premier capteur du type demandé en mode appairage est retenu.",
-            "examples": [
-              "a4f4-d1ec-8ff1-376e"
-            ]
           }
         }
       },
@@ -3046,7 +2853,7 @@
       },
       "SensorUpdate": {
         "type": "object",
-        "description": "Métadonnées d'un capteur. Au moins un champ est requis ; les autres restent inchangés.\n\nEn mode `fbxhome`, les quatre drapeaux d'alarme sont aussi poussés vers le firmware. Ces écritures sont au mieux-effort : un échec est journalisé mais la réponse reste `200`.",
+        "description": "Métadonnées d'un capteur. Au moins un champ est requis ; les autres restent inchangés.",
         "minProperties": 1,
         "properties": {
           "label": {
@@ -3056,22 +2863,6 @@
           "night_allowed": {
             "type": "boolean",
             "description": "Ignorer ce capteur en mode nuit."
-          },
-          "day_alarm": {
-            "type": "boolean",
-            "description": "Déclenche l'alarme en mode jour."
-          },
-          "night_alarm": {
-            "type": "boolean",
-            "description": "Déclenche l'alarme en mode nuit."
-          },
-          "day_timed": {
-            "type": "boolean",
-            "description": "Applique le délai d'entrée en mode jour."
-          },
-          "night_timed": {
-            "type": "boolean",
-            "description": "Applique le délai d'entrée en mode nuit."
           }
         }
       },
@@ -3134,30 +2925,6 @@
           },
           "open": {
             "type": "boolean"
-          }
-        }
-      },
-      "StreamInfo": {
-        "type": "object",
-        "description": "Paramètres de connexion au flux SRT.",
-        "required": [
-          "srt_url",
-          "passphrase",
-          "port"
-        ],
-        "properties": {
-          "srt_url": {
-            "type": "string",
-            "description": "URL prête à l'emploi, construite depuis l'hôte de la requête.",
-            "examples": [
-              "srt://192.0.2.20:9000?passphrase=xxx&mode=caller"
-            ]
-          },
-          "passphrase": {
-            "type": "string"
-          },
-          "port": {
-            "type": "integer"
           }
         }
       },

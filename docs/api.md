@@ -80,11 +80,8 @@ acceptée. Trois cas où l'écart est visible :
   vérité arrive quelques centaines de ms plus tard via MQTT et peut
   contredire la réponse. Pour l'état réel, lire `GET /api/v1/alarm` ou
   s'abonner au flux SSE.
-- `PUT /kpd/code` persiste le code immédiatement mais **diffère l'écriture
-  radio jusqu'à 30 s** si le clavier vient d'être appairé (le cycle bytecode
-  post-pairing ne doit pas être interrompu). En mode `charmux`, le code
-  part au prochain réveil du clavier. Le `200` ne dit rien du clavier,
-  seulement de la config.
+- `PUT /kpd/code` persiste le code ; il part au prochain réveil du
+  clavier. Le `200` ne dit rien du clavier, seulement de la config.
 
 Ne « corrigez » pas les commandes en ressources REST : elles ne modélisent
 pas un état, elles déclenchent un effet.
@@ -107,36 +104,31 @@ pas un état, elles déclenchent un effet.
 
 | Méthode | Chemin | Corps | Réponse |
 |---|---|---|---|
-| `GET` | `/api/v1/sensors` | — | tableau de capteurs + `label`, `night_allowed`, `day_alarm?`, `night_alarm?`, `day_timed?`, `night_timed?` |
-| `PUT` | `/api/v1/sensors/{id}` | au moins un champ parmi `label`, `night_allowed`, `day_alarm`, `night_alarm`, `day_timed`, `night_timed` | `{ok:true}` |
+| `GET` | `/api/v1/sensors` | — | tableau de capteurs + `label`, `night_allowed` |
+| `PUT` | `/api/v1/sensors/{id}` | au moins un champ parmi `label`, `night_allowed` | `{ok:true}` |
 | `DELETE` | `/api/v1/sensors/{id}` | — | `{ok:true}` |
 
-`GET /sensors` ne lit pas l'état temps réel des capteurs (batterie,
-température, ouverture) : chaque lecture attendrait le MCU ~3 s, soit 15 s
-pour cinq capteurs. Ces valeurs arrivent par le flux SSE.
-
-`PUT /sensors/{id}` fait plus que renommer : en mode fbxhome, chaque flag
-modifié déclenche un `endpoints_write` vers le firmware. **Ces écritures
-sont best-effort** — un échec est loggué en warning, pas remonté dans la
-réponse. Le `200` couvre la persistance en config, pas le push firmware.
+`GET /sensors` renvoie l'état connu de chaque capteur, sans interroger la
+radio : les capteurs le signalent eux-mêmes, et les changements arrivent
+par le flux SSE. `night_allowed` : capteur ignoré quand l'alarme
+(`standalone`) est armée pour la nuit.
 
 ### Appairage
 
 | Méthode | Chemin | Corps | Réponse |
 |---|---|---|---|
-| `POST` | `/api/v1/sensors/pair` | `{type, fingerprint}` | `{session}` |
+| `POST` | `/api/v1/sensors/pair` | `{type}` | `{session}` |
 | `GET` | `/api/v1/sensors/pair/{session}` | — | `{done, sensor?}` |
 | `DELETE` | `/api/v1/sensors/pair/{session}` | — | `{ok:true}` |
 
-`type` ∈ `DWS`, `PIR`, `SRN`, `KPD`. `fingerprint` = 16 caractères hex du QR
-code ; les tirets, espaces et majuscules sont normalisés, une chaîne de
-32 caractères est tronquée aux 16 premiers. En mode `charmux`, le
-fingerprint est ignoré : le premier capteur du `type` demandé qui se met en
-mode appairage est retenu.
+`type` ∈ `DWS`, `PIR`, `SRN`, `KPD` : le premier capteur de ce type qui se
+met en mode appairage est retenu. Après 3 appairages ratés d'affilée, la
+route répond `500` jusqu'au redémarrage de la caméra (au-delà, le MCU
+radio cesse de répondre).
 
-En mode `charmux`, `DELETE /sensors/{id}` arrête de servir le capteur mais
-ne le retire pas du MCU, qui n'a aucun moyen d'oublier un capteur : le
-réinitialiser pour qu'il se taise.
+`DELETE /sensors/{id}` arrête de servir le capteur mais ne le retire pas
+du MCU, qui n'a aucun moyen d'oublier un capteur : le réinitialiser pour
+qu'il se taise.
 
 Boucler sur `GET` jusqu'à `done:true`, puis `DELETE` pour libérer la session
 si l'utilisateur abandonne.
@@ -162,13 +154,12 @@ Le modèle assume **un seul clavier** :
 
 | Chemin | `GET` renvoie | `PUT` accepte |
 |---|---|---|
-| `/api/v1/config` | agrégat de tout + `camera_mode` | — (lecture seule) |
+| `/api/v1/config` | agrégat de tout | — (lecture seule) |
 | `/api/v1/config/mqtt` | idem, `password` masqué, `tls_*` en lecture seule | `{broker, username?, password?, topic_prefix?}` |
 | `/api/v1/config/homekit` | idem, `pin` masqué | `{enabled, pin?, name?, camera?}` |
 | `/api/v1/config/admin` | `{password_set}` — **jamais** le mot de passe ni son hash | `{password}` (8 caractères min., vide refusé) — `DELETE` désactive l'auth |
 | `/api/v1/config/alarm` | idem | `{mode?, alarmo_command_topic?, alarmo_state_topic?, siren_sounds?, arming_delay_seconds?, pending_delay_seconds?, wail_duration_seconds?}` |
 | `/api/v1/config/web` | `{enabled}` | `{enabled}` |
-| `/api/v1/config/fbxhome_alarm` | idem | `{timeout_before_armed, timeout_before_alert, timeout_alert, history_when_armed}` |
 
 Contraintes validées côté serveur (`400` sinon) :
 
@@ -195,8 +186,6 @@ Notes :
   hors du réseau local, et configurer un mot de passe admin.
 - `PUT /config/mqtt` répond `{"reboot_required":true}` : le broker n'est lu
   qu'au boot. `PUT /config/web` répond `{"restart_required":true}`.
-- `camera_mode` (`fbxhome` ou `charmux`) indique à l'UI quels réglages ont
-  un sens. `/config/fbxhome_alarm` répond `400` en mode charmux.
 
 ### Mise à jour
 
@@ -220,7 +209,6 @@ GitHub est injoignable.
 | `POST` | `/api/v1/commands/siren/test` | — | bip de test discret |
 | `POST` | `/api/v1/commands/siren/alarm_test` | — | wail d'intrusion |
 | `POST` | `/api/v1/commands/stream/start` | — | ouvre le cache **et** relance HLS |
-| `POST` | `/api/v1/commands/stream/open` | — | `{srt_url, passphrase, port}` |
 | `POST` | `/api/v1/commands/update/install` | `{tag?}` | `202 Accepted`, suivre `/update/status` |
 
 `404` si aucune sirène n'est appairée. `409` si une installation OTA est
