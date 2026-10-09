@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -48,9 +49,9 @@ type FbxhomeClient struct {
 	done   chan struct{}
 	once   sync.Once
 
-	mu          sync.RWMutex
-	sensors     map[int]Sensor    // last known state, keyed by node ID
-	fingerprints map[int]string   // pending fingerprints by pairing session ID
+	mu           sync.RWMutex
+	sensors      map[int]Sensor // last known state, keyed by node ID
+	fingerprints map[int]string // pending fingerprints by pairing session ID
 }
 
 // Option configures a FbxhomeClient.
@@ -88,11 +89,11 @@ func NewFbxhomeClient(opts ...Option) *FbxhomeClient {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	c := &FbxhomeClient{
-		privURL: "http://[::1]:10000",
-		homeURL: "https://[::1]:64218",
-		http:    &http.Client{Timeout: 10 * time.Second, Transport: tr},
-		runner:  execRunner{},
-		logger:  slog.Default(),
+		privURL:      "http://[::1]:10000",
+		homeURL:      "https://[::1]:64218",
+		http:         &http.Client{Timeout: 10 * time.Second, Transport: tr},
+		runner:       execRunner{},
+		logger:       slog.Default(),
 		events:       make(chan SensorEvent, 64),
 		done:         make(chan struct{}),
 		sensors:      make(map[int]Sensor),
@@ -248,6 +249,11 @@ func shouldReauth(resp *http.Response) (reauth bool, consumed []byte) {
 	return false, nil
 }
 
+// errStateUnknown: fbxhome forgets door and motion states when it restarts and
+// answers null until the sensor reports again. Publishing that as "closed"
+// would overwrite the state Home Assistant kept.
+var errStateUnknown = errors.New("fbxhome: sensor has not reported its state yet")
+
 // ReadSensor reads endpoint values for a single sensor. sensorType is required
 // because fbxhome uses the same `state` endpoint for DWS open/closed state and
 // PIR motion; it is not a PIR cover/tamper state.
@@ -295,8 +301,22 @@ func (c *FbxhomeClient) ReadSensor(ctx context.Context, nodeID int, sensorType s
 		return nil, fmt.Errorf("endpoints_read: empty response for node %d", nodeID)
 	}
 
+	if (sensorType == "DWS" || sensorType == "PIR") && !hasStateValue(result.List[0]) {
+		return nil, fmt.Errorf("node %d: %w", nodeID, errStateUnknown)
+	}
+
 	s := endpointResultToSensor(nodeID, sensorType, result.List[0])
 	return &s, nil
+}
+
+func hasStateValue(er endpointResult) bool {
+	for _, ep := range er.EPValues {
+		if ep.EPName == "state" {
+			_, ok := ep.Value.(bool)
+			return ok
+		}
+	}
+	return false
 }
 
 // EndpointsRead reads raw endpoint values for a node (public API).
@@ -716,6 +736,10 @@ func (c *FbxhomeClient) pollOnce(ctx context.Context) {
 			eps = []string{"battery"}
 		}
 		updated, err := c.ReadSensor(ctx, s.ID, s.Type, eps)
+		if errors.Is(err, errStateUnknown) {
+			c.logger.Debug("poll skipped (no live state yet)", "node_id", s.ID)
+			continue
+		}
 		if err != nil {
 			c.logger.Error("poll read sensor failed", "node_id", s.ID, "error", err)
 			continue

@@ -3,6 +3,7 @@ package camera
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -452,6 +453,113 @@ func TestEvents_PollEmitsOnChange(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for state change event")
+	}
+
+	_ = c.Close()
+}
+
+// fbxhome answers null for a door state it lost in a restart: that is not
+// "closed", and must not reach Home Assistant as such.
+func TestReadSensor_NullStateIsUnknown(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/home/endpoints_read", func(w http.ResponseWriter, r *http.Request) {
+		resp := endpointsReadResponse{
+			List: []endpointResult{{
+				NodeID: 52,
+				EPValues: []endpointValue{
+					{EPName: "battery", Value: float64(100)},
+					{EPName: "state", Value: nil},
+				},
+			}},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	srv := newTestServer(t, mux)
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	_ = c.Connect(context.Background())
+
+	s, err := c.ReadSensor(context.Background(), 52, "DWS", []string{"state", "temperature", "battery"})
+	if !errors.Is(err, errStateUnknown) {
+		t.Fatalf("err = %v, want errStateUnknown", err)
+	}
+	if s != nil {
+		t.Errorf("sensor = %+v, want nil", s)
+	}
+}
+
+func TestReadSensor_NoStateEndpointForKeypad(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/home/endpoints_read", func(w http.ResponseWriter, r *http.Request) {
+		resp := endpointsReadResponse{
+			List: []endpointResult{{NodeID: 31, EPValues: []endpointValue{{EPName: "battery", Value: float64(80)}}}},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	srv := newTestServer(t, mux)
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	_ = c.Connect(context.Background())
+
+	s, err := c.ReadSensor(context.Background(), 31, "KPD", []string{"battery"})
+	if err != nil {
+		t.Fatalf("ReadSensor: %v", err)
+	}
+	if s.Battery != 80 {
+		t.Errorf("Battery = %d, want 80", s.Battery)
+	}
+}
+
+func TestEvents_PollWaitsForKnownState(t *testing.T) {
+	callCount := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("/rpc/get_domus_nodes", func(w http.ResponseWriter, r *http.Request) {
+		resp := domusNodesResponse{
+			Result: []domusNode{{
+				ID: 52, TypeName: "Node.DomusNode.HlDws", ItemID: "abc",
+				Values: domusValues{Reachable: 1},
+			}},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	mux.HandleFunc("/api/v1/home/endpoints_read", func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		// Unknown on the first poll, open once the sensor has reported.
+		var state interface{}
+		if callCount >= 2 {
+			state = true
+		}
+		resp := endpointsReadResponse{
+			List: []endpointResult{{NodeID: 52, EPValues: []endpointValue{{EPName: "state", Value: state}}}},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	srv := newTestServer(t, mux)
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	_ = c.Connect(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	c.StartPolling(ctx, 50*time.Millisecond)
+
+	select {
+	case ev := <-c.Events():
+		if !ev.Sensor.Open {
+			t.Errorf("first event Open = false: the unknown state was published as closed")
+		}
+		if callCount < 2 {
+			t.Errorf("event emitted after %d poll(s), want it only once the state is known", callCount)
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for the event")
 	}
 
 	_ = c.Close()
