@@ -485,8 +485,51 @@ func TestReadSensor_NullStateIsUnknown(t *testing.T) {
 	if !errors.Is(err, errStateUnknown) {
 		t.Fatalf("err = %v, want errStateUnknown", err)
 	}
-	if s != nil {
-		t.Errorf("sensor = %+v, want nil", s)
+	if s == nil || s.Battery != 100 {
+		t.Errorf("sensor = %+v, want the battery reading returned with the error", s)
+	}
+}
+
+// An unknown state publishes nothing, but the readings are kept: the sensor's
+// first real event must not reach Home Assistant with battery 0 / unreachable.
+func TestPoll_UnknownStateKeepsReadings(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/rpc/get_domus_nodes", func(w http.ResponseWriter, r *http.Request) {
+		resp := domusNodesResponse{
+			Result: []domusNode{{ID: 52, TypeName: "Node.DomusNode.HlDws", ItemID: "abc", Values: domusValues{Reachable: 1}}},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	mux.HandleFunc("/api/v1/home/endpoints_read", func(w http.ResponseWriter, r *http.Request) {
+		resp := endpointsReadResponse{
+			List: []endpointResult{{NodeID: 52, EPValues: []endpointValue{
+				{EPName: "state", Value: nil},
+				{EPName: "battery", Value: float64(100)},
+			}}},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	srv := newTestServer(t, mux)
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	_ = c.Connect(context.Background())
+
+	c.pollOnce(context.Background())
+	select {
+	case ev := <-c.Events():
+		t.Fatalf("unexpected event %+v for an unknown state", ev)
+	default:
+	}
+
+	c.UpdateCachedSensor(Sensor{ID: 52, Type: "DWS", Open: true})
+	cached := c.CachedSensors()
+	if len(cached) != 1 {
+		t.Fatalf("cached = %+v, want one sensor", cached)
+	}
+	if got := cached[0]; !got.Open || got.Battery != 100 || !got.Reachable {
+		t.Errorf("cached = %+v, want open with battery 100 and reachable", got)
 	}
 }
 

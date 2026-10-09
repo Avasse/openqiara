@@ -301,11 +301,11 @@ func (c *FbxhomeClient) ReadSensor(ctx context.Context, nodeID int, sensorType s
 		return nil, fmt.Errorf("endpoints_read: empty response for node %d", nodeID)
 	}
 
-	if (sensorType == "DWS" || sensorType == "PIR") && !hasStateValue(result.List[0]) {
-		return nil, fmt.Errorf("node %d: %w", nodeID, errStateUnknown)
-	}
-
 	s := endpointResultToSensor(nodeID, sensorType, result.List[0])
+	if (sensorType == "DWS" || sensorType == "PIR") && !hasStateValue(result.List[0]) {
+		// The other readings (battery, temperature) are valid: returned with the error.
+		return &s, fmt.Errorf("node %d: %w", nodeID, errStateUnknown)
+	}
 	return &s, nil
 }
 
@@ -709,6 +709,10 @@ func (c *FbxhomeClient) pollLoop(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	// A first read right away: events arriving before the first tick merge
+	// with these readings (battery, reachability) instead of zeros.
+	c.pollOnce(ctx)
+
 	for {
 		select {
 		case <-c.done:
@@ -737,7 +741,10 @@ func (c *FbxhomeClient) pollOnce(ctx context.Context) {
 		}
 		updated, err := c.ReadSensor(ctx, s.ID, s.Type, eps)
 		if errors.Is(err, errStateUnknown) {
+			// Nothing published, but battery and reachability are kept so the
+			// sensor's first real event carries them instead of zeros.
 			c.logger.Debug("poll skipped (no live state yet)", "node_id", s.ID)
+			c.cacheReadings(s, *updated)
 			continue
 		}
 		if err != nil {
@@ -766,6 +773,23 @@ func (c *FbxhomeClient) pollOnce(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// cacheReadings stores a sensor's readings without touching the open or motion
+// state the cache may already hold from a real event.
+func (c *FbxhomeClient) cacheReadings(listed, read Sensor) {
+	read.TypeName = listed.TypeName
+	read.ItemID = listed.ItemID
+	read.Type = listed.Type
+	read.Reachable = listed.Reachable
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cur, ok := c.sensors[listed.ID]; ok {
+		read.Open = cur.Open
+		read.Motion = cur.Motion
+		read.LastSeen = max(read.LastSeen, cur.LastSeen)
+	}
+	c.sensors[listed.ID] = read
 }
 
 // Close stops polling and closes the event channel.
