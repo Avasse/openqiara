@@ -455,7 +455,7 @@ func main() {
 	}
 	// The siren keeps the alarm (internal/alarm): the standalone engine
 	// drives it, and in alarmo mode sirenCtrl mirrors Alarmo's state on it.
-	siren := nativeSiren{ctx: ctx, cam: cam, store: store}
+	siren := alarm.NewSirenDriver(nativeSiren{ctx: ctx, cam: cam, store: store}, logger)
 	sirenCtrl := newSirenController(ctx, siren, logger)
 
 	alarmStateCallback := func(snap alarm.Snapshot) {
@@ -604,13 +604,12 @@ func main() {
 		}
 	}()
 
-	// The siren's reports: its state is the alarm's in standalone mode,
-	// and is reconciled with Alarmo's in alarmo mode.
+	// The siren's reports: the driver brings the siren back to the state
+	// wanted, and in standalone mode they move the alarm on.
 	onSirenState := func(state string) {
+		siren.HandleReport(alarm.SirenState(state))
 		if alarmEngine != nil && store.Get().AlarmMode() == "standalone" {
 			alarmEngine.HandleSirenState(alarm.SirenState(state))
-		} else {
-			sirenCtrl.SirenState(state)
 		}
 	}
 

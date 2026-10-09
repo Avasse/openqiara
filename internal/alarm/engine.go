@@ -1,17 +1,20 @@
-// Package alarm implements the standalone alarm.
+// Package alarm implements the standalone alarm and the driver of the
+// siren (siren.go), which both alarm modes share.
 //
 // The siren keeps the alarm, as it did under fbxhome: armed, it counts the
 // exit and entry delays, plays their beeps and wails, and it hears the
-// sensors itself when the gateway is gone. The engine arms and disarms it,
-// tells it when a sensor is in alarm (entry delay or alert, as fbxhome
-// did), and takes its state from what the siren reports. A command the
-// siren does not answer within relayTimeout sets the alarm off here. Without a siren (or with siren_sounds none),
-// the engine counts the delays itself.
+// sensors itself when the gateway is gone. The engine stays the authority
+// on the alarm's state: it arms the siren, tells it the entry delay or the
+// alert, and counts the delays too, a little longer than the siren. The
+// siren's reports can only move the alarm forward (armed, entry delay, set
+// off), never back: a set-off alarm leaves that state only when disarmed.
+// A delay that ends without the siren's report (torn off, a report lost)
+// moves the alarm on all the same. Without a siren, the engine's own delays
+// are the alarm's.
 //
 // The engine also keeps what the siren does not know: the mode (away or
-// night), when it was armed and which sensor set it off. That and the
-// state are persisted across reboots; the siren's next report reconciles
-// them.
+// night), when it was armed and which sensor set it off, persisted across
+// reboots.
 package alarm
 
 import (
@@ -29,27 +32,22 @@ type State string
 
 const (
 	StateDisarmed   State = "disarmed"
-	StateArming     State = "arming" // exit delay, counted by the siren
+	StateArming     State = "arming" // exit delay
 	StateArmedNight State = "armed_night"
 	StateArmedAway  State = "armed_away"
-	StatePending    State = "pending"   // entry delay, counted by the siren
+	StatePending    State = "pending"   // entry delay
 	StateTriggered  State = "triggered" // set off, until disarmed
 )
 
-// Default delays, shown to the user while the siren counts them.
+// Default delays.
 const (
 	DefaultArmingDelay  = 60 * time.Second
 	DefaultPendingDelay = 60 * time.Second
 )
 
-// rearmEvery spaces out the re-arming of a siren found off while the alarm
-// is armed (it rebooted): a siren that keeps refusing does not loop.
-const rearmEvery = 30 * time.Second
-
-// relayTimeout is how long a relayed alarm waits for the siren's report
-// before the alarm goes off without it (a mute or unreachable siren). A
-// variable for the tests.
-var relayTimeout = 10 * time.Second
+// sirenMargin is how much longer than the siren the engine waits at the
+// end of a delay, for the siren to report it first. A variable for tests.
+var sirenMargin = 5 * time.Second
 
 // persistedState is the on-disk representation.
 type persistedState struct {
@@ -67,8 +65,8 @@ type Snapshot struct {
 	ArmedAt       int64 `json:"armed_at,omitempty"`
 	TriggeredBy   int   `json:"triggered_by,omitempty"`
 	PreviousState State `json:"previous_state,omitempty"` // the armed mode
-	// TimerRemaining is the seconds left in the exit or entry delay, as
-	// the siren should count them; 0 otherwise.
+	// TimerRemaining is the seconds left in the exit or entry delay; 0
+	// otherwise.
 	TimerRemaining int `json:"timer_remaining,omitempty"`
 }
 
@@ -88,22 +86,13 @@ type ConfigProvider func(sensorID int) SensorConfig
 // It is called under the engine's lock, so callbacks must not call back into the engine.
 type StateChangeCallback func(snap Snapshot)
 
-// Siren is the paired siren, as the engine drives it. Its state comes back
-// through HandleSirenState.
+// Siren is the siren as the engine commands it (SirenDriver).
 type Siren interface {
-	// Present tells whether there is a siren to keep the alarm.
 	Present() bool
-	// Arm arms it for the mode, after the exit delay or at once.
-	Arm(night, delayed bool) error
-	// EntryDelay starts its entry delay, which it counts before the alert.
-	EntryDelay() error
-	// Alert sets it off.
-	Alert() error
-	// Disarm disarms it and stops its sound, whether it keeps the alarm or
-	// not (siren_sounds none): it must never stay armed.
-	Disarm() error
-	// Wail plays its sound, when the alarm goes off without it.
-	Wail() error
+	Arm(night, delayed bool)
+	Disarm()
+	EntryDelay()
+	Alert()
 }
 
 // SirenState is a state the siren reports.
@@ -121,16 +110,13 @@ const (
 
 // Engine is the alarm.
 type Engine struct {
-	mu        sync.Mutex
-	state     State
-	mode      State // armed_away or armed_night while not disarmed
-	armedAt   int64
-	trigBy    int
-	deadline  time.Time // end of the delay in progress, for display
-	lastRearm time.Time
-	sirenSeen time.Time // last report of the siren
-	expectOff int       // "off" reports our own disarming will bring
-	timerGen  int       // bumped by every transition: stale timers do nothing
+	mu       sync.Mutex
+	state    State
+	mode     State // armed_away or armed_night while not disarmed
+	armedAt  int64
+	trigBy   int
+	deadline time.Time // end of the delay in progress
+	timerGen int       // bumped by every transition: stale timers do nothing
 
 	armingDelay  time.Duration
 	pendingDelay time.Duration
@@ -146,7 +132,7 @@ type Engine struct {
 	logger    *slog.Logger
 }
 
-// New creates the engine. siren may be nil: no siren.
+// New creates the engine.
 func New(path string, siren Siren, configFor ConfigProvider, onChange StateChangeCallback, logger *slog.Logger) *Engine {
 	if logger == nil {
 		logger = slog.Default()
@@ -167,8 +153,7 @@ func New(path string, siren Siren, configFor ConfigProvider, onChange StateChang
 	}
 }
 
-// SetTimings sets the delays shown while the siren counts them; the siren
-// gets them at its next arming. 0 keeps the current value.
+// SetTimings sets the exit and entry delays. 0 keeps the current value.
 func (e *Engine) SetTimings(arming, pending time.Duration) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -180,14 +165,16 @@ func (e *Engine) SetTimings(arming, pending time.Duration) {
 	}
 }
 
-// Load restores the engine state from disk, as it was: the siren's next
-// report reconciles it. A missing file leaves the alarm disarmed.
+// Load restores the engine state from disk and tells the siren what to
+// want. An exit delay cut by the restart ends armed; an entry delay starts
+// again, so that it still ends set off.
 func (e *Engine) Load() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	data, err := os.ReadFile(e.path)
 	if errors.Is(err, os.ErrNotExist) {
+		e.siren.Disarm()
 		return nil
 	}
 	if err != nil {
@@ -205,15 +192,23 @@ func (e *Engine) Load() error {
 		mode = StateArmedAway
 	}
 	switch p.State {
-	case StateArming, StateArmedAway, StateArmedNight, StatePending, StateTriggered:
+	case StateArming, StateArmedAway, StateArmedNight:
+		e.state, e.mode, e.armedAt = mode, mode, p.ArmedAt
+	case StatePending, StateTriggered:
 		e.state, e.mode, e.armedAt, e.trigBy = p.State, mode, p.ArmedAt, p.TriggeredBy
 	default:
 		e.state = StateDisarmed
 	}
-	if !e.hasSiren() && (e.state == StateArming || e.state == StatePending) {
-		e.state = mode // its timer died with the process
-	}
 	e.logger.Info("alarm: state loaded", "state", e.state, "mode", e.mode)
+	if e.state == StateDisarmed {
+		e.siren.Disarm()
+		return nil
+	}
+	e.siren.Arm(e.mode == StateArmedNight, false)
+	if e.state == StatePending {
+		e.deadline = time.Now().Add(e.pendingDelay)
+		e.entryTimerLocked()
+	}
 	return nil
 }
 
@@ -251,9 +246,7 @@ func (e *Engine) HandleCommand(cmd string, source Source) {
 			return
 		}
 		e.transitionLocked(StateDisarmed, "user disarm")
-		if e.siren != nil {
-			e.sirenErr("disarm", e.siren.Disarm())
-		}
+		e.siren.Disarm()
 
 	case "arm_away", "arm_night":
 		mode := StateArmedAway
@@ -262,50 +255,34 @@ func (e *Engine) HandleCommand(cmd string, source Source) {
 		}
 		switch e.state {
 		case StateDisarmed:
-			e.armLocked(mode, source == SourceLocal)
+			e.mode, e.trigBy = mode, 0
+			delayed := source == SourceLocal
+			// Armed before any alert is sent to it: an unarmed siren
+			// ignores it.
+			e.siren.Arm(mode == StateArmedNight, delayed)
+			if !delayed {
+				e.armedLocked("armed")
+				return
+			}
+			e.transitionLocked(StateArming, "arming")
+			e.afterLocked(e.armingDelay+e.margin(), func() {
+				if e.state == StateArming {
+					e.armedLocked("exit delay over")
+				}
+			})
 		case StateArmedAway, StateArmedNight:
 			if e.state == mode {
 				return
 			}
-			// The siren takes the mode's sensors only when armed from off.
 			e.mode = mode
 			e.transitionLocked(mode, "switch mode")
-			if e.hasSiren() {
-				e.expectOff++
-				e.sirenErr("disarm", e.siren.Disarm())
-				e.sirenErr("arm", e.siren.Arm(mode == StateArmedNight, false))
-			}
+			e.siren.Arm(mode == StateArmedNight, false)
 		default:
 			// Arming, pending or triggered: disarm first.
 		}
 
 	default:
 		e.logger.Warn("alarm: unknown command", "cmd", cmd)
-	}
-}
-
-// armLocked arms from disarmed, with or without the exit delay.
-func (e *Engine) armLocked(mode State, delayed bool) {
-	e.mode, e.trigBy = mode, 0
-	if !e.hasSiren() {
-		if !delayed {
-			e.armedLocked("armed, no siren")
-			return
-		}
-		e.transitionLocked(StateArming, "arming, no siren")
-		e.afterLocked(e.armingDelay, func() {
-			if e.state == StateArming {
-				e.armedLocked("exit delay over")
-			}
-		})
-		return
-	}
-	// Armed before anything is relayed to it: an unarmed siren ignores it.
-	e.sirenErr("arm", e.siren.Arm(mode == StateArmedNight, delayed))
-	if delayed {
-		e.transitionLocked(StateArming, "arming")
-	} else {
-		e.armedLocked("armed")
 	}
 }
 
@@ -344,60 +321,72 @@ func (e *Engine) watchedLocked(sensorID int) bool {
 	return !(e.mode == StateArmedNight && e.configFor(sensorID).NightAllowed)
 }
 
-// sensorAlarmLocked tells the siren a sensor is in alarm: the entry delay
-// for a delayed sensor while armed, the alert for an instant one or once
-// the alarm is under way. The siren reports its state; one that stays
-// mute leaves the alarm to go off here. Without a siren, the engine runs
-// the entry delay itself.
-//
-// A sensor's report relayed as is would let the siren decide, but it then
-// reports nothing, not even to 55 06 (hardware, 2026-10-09): commands it
-// always answers.
+// sensorAlarmLocked moves the alarm on for a sensor in alarm: the entry
+// delay for a delayed sensor while armed, the alert for an instant one or
+// once the alarm is under way, a delayed one during the entry delay
+// excepted. The siren is told the same, as fbxhome told it.
 func (e *Engine) sensorAlarmLocked(sensorID int) {
 	e.logger.Info("alarm: sensor in alarm", "sensor_id", sensorID, "state", e.state)
-	armed := e.state == StateArmedAway || e.state == StateArmedNight
 	instant := e.configFor(sensorID).Instant
-	if armed {
+	switch e.state {
+	case StateArmedAway, StateArmedNight:
 		e.trigBy = sensorID
-	}
-	if !e.hasSiren() {
-		e.localAlarmLocked(armed, instant)
-		return
-	}
-	switch {
-	case armed && !instant:
-		e.sirenErr("entry delay", e.siren.EntryDelay())
-	case e.state == StatePending && !instant:
-		return // the siren counts it already
-	default:
-		e.sirenErr("alert", e.siren.Alert())
-	}
-	if armed {
-		relayed := time.Now()
-		e.afterLocked(relayTimeout, func() {
-			if e.sirenSeen.Before(relayed) && (e.state == StateArmedAway || e.state == StateArmedNight) {
-				e.logger.Error("alarm: the siren did not answer a sensor's alarm, going off without it", "sensor_id", sensorID)
-				e.transitionLocked(StateTriggered, "siren mute")
-				e.sirenErr("wail", e.siren.Wail())
-			}
-		})
+		if instant {
+			e.triggerLocked("instant sensor")
+			return
+		}
+		e.transitionLocked(StatePending, "entry delay")
+		e.siren.EntryDelay()
+		e.entryTimerLocked()
+	case StatePending:
+		if instant {
+			e.triggerLocked("instant sensor")
+		}
+	case StateTriggered:
+		e.siren.Alert() // again, after an alert that ended
 	}
 }
 
-// localAlarmLocked runs the entry delay and the alert without a siren.
-func (e *Engine) localAlarmLocked(armed, instant bool) {
+// entryTimerLocked sets the alarm off when the entry delay ends without
+// the siren's report.
+func (e *Engine) entryTimerLocked() {
+	e.afterLocked(time.Until(e.deadline)+e.margin(), func() {
+		if e.state == StatePending {
+			e.triggerLocked("entry delay over")
+		}
+	})
+}
+
+func (e *Engine) triggerLocked(reason string) {
+	e.transitionLocked(StateTriggered, reason)
+	e.siren.Alert()
+}
+
+// HandleSirenState moves the alarm on as the siren reports: the end of its
+// exit delay, an entry delay or an alert it started itself (the gateway
+// was gone). It never moves the alarm back: a late or stray report, or a
+// siren that rebooted, changes nothing (SirenDriver brings the siren back).
+func (e *Engine) HandleSirenState(s SirenState) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	switch {
-	case e.state == StateTriggered:
-	case instant:
-		e.transitionLocked(StateTriggered, "sensor, no siren")
-	case armed:
-		e.transitionLocked(StatePending, "entry delay, no siren")
-		e.afterLocked(e.pendingDelay, func() {
-			if e.state == StatePending {
-				e.transitionLocked(StateTriggered, "entry delay over")
-			}
-		})
+	case s == SirenArmed && e.state == StateArming:
+		e.armedLocked("exit delay over")
+	case s == SirenEntryDelay && (e.state == StateArmedAway || e.state == StateArmedNight):
+		e.transitionLocked(StatePending, "siren entry delay")
+		e.entryTimerLocked()
+	case (s == SirenAlert || s == SirenAlertOver) && e.state != StateDisarmed && e.state != StateTriggered:
+		e.transitionLocked(StateTriggered, "siren "+string(s))
 	}
+}
+
+// margin is how much longer than the siren the engine counts a delay: 0
+// without a siren, the engine's delays being the alarm's.
+func (e *Engine) margin() time.Duration {
+	if e.siren.Present() {
+		return sirenMargin
+	}
+	return 0
 }
 
 // afterLocked runs fn under the lock after d, unless the state changed in
@@ -411,66 +400,6 @@ func (e *Engine) afterLocked(d time.Duration, fn func()) {
 			fn()
 		}
 	})
-}
-
-// HandleSirenState takes the siren's report as the alarm's state. A siren
-// found armed while the alarm is disarmed is disarmed; one found off while
-// the alarm is armed (it rebooted) is armed again, at once.
-func (e *Engine) HandleSirenState(s SirenState) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if !e.hasSiren() {
-		return
-	}
-	e.sirenSeen = time.Now()
-
-	var next State
-	switch s {
-	case SirenOff:
-		if e.expectOff > 0 {
-			e.expectOff-- // our own disarming, on a change of mode
-			return
-		}
-		if e.state != StateDisarmed && time.Since(e.lastRearm) > rearmEvery {
-			e.lastRearm = time.Now()
-			e.logger.Warn("alarm: siren found off while armed, arming it again", "state", e.state)
-			e.sirenErr("arm", e.siren.Arm(e.mode == StateArmedNight, false))
-		}
-		return
-	case SirenExitDelay:
-		next = StateArming
-	case SirenArmed:
-		next = e.mode
-	case SirenEntryDelay:
-		next = StatePending
-	case SirenAlert, SirenAlertOver:
-		next = StateTriggered
-	default:
-		return // the test sound
-	}
-	if e.state == StateDisarmed {
-		e.logger.Warn("alarm: siren found armed while disarmed, disarming it", "siren", s)
-		e.sirenErr("disarm", e.siren.Disarm())
-		return
-	}
-	if next == e.state {
-		return
-	}
-	if e.state == StateArming && next == e.mode {
-		e.armedLocked("exit delay over")
-		return
-	}
-	e.transitionLocked(next, "siren "+string(s))
-}
-
-func (e *Engine) hasSiren() bool {
-	return e.siren != nil && e.siren.Present()
-}
-
-func (e *Engine) sirenErr(what string, err error) {
-	if err != nil {
-		e.logger.Error("alarm: siren "+what+" failed", "error", err)
-	}
 }
 
 // transitionLocked changes state, persists, notifies.

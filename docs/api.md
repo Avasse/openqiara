@@ -208,8 +208,8 @@ GitHub est injoignable.
 | `POST` | `/api/v1/commands/alarm` | `{action}` | `arm_away`, `arm_night` ou `disarm` |
 | `POST` | `/api/v1/commands/reboot` | — | redémarre la caméra |
 | `POST` | `/api/v1/commands/shutter` | `{open}` | ouvre/ferme le cache objectif |
-| `POST` | `/api/v1/commands/siren/test` | — | bip de test discret |
-| `POST` | `/api/v1/commands/siren/alarm_test` | — | wail d'intrusion |
+| `POST` | `/api/v1/commands/siren/test` | — | son de test discret (sirène désarmée) |
+| `POST` | `/api/v1/commands/siren/alarm_test` | — | son de test à pleine puissance, 63 s au plus (sirène désarmée) |
 | `POST` | `/api/v1/commands/stream/start` | — | ouvre le cache **et** relance HLS |
 | `POST` | `/api/v1/commands/update/install` | `{tag?}` | `202 Accepted`, suivre `/update/status` |
 

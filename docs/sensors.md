@@ -88,13 +88,20 @@ la liste des capteurs surveillés ; elle compte ensuite elle-même le délai de
 sortie (bips réguliers), le délai d'entrée (bips d'avertissement) et la
 durée de l'alarme.
 
-- **Mode `standalone`** : la sirène est la centrale. openqiarad l'arme
-  (au clavier avec le délai de sortie, depuis HA ou HomeKit sans), lui
-  signale chaque détection (délai d'entrée, ou alerte pour un capteur
-  `instant`) et publie l'état qu'elle rapporte. Si elle ne répond pas
-  dans les 10 s, openqiarad déclenche l'alarme sans elle.
+- **Mode `standalone`** : openqiarad arme la sirène (au clavier avec le
+  délai de sortie, depuis HA ou HomeKit sans) et lui signale chaque
+  détection (délai d'entrée, ou alerte pour un capteur `instant`). Il
+  compte les délais lui aussi, un peu plus longtemps qu'elle : si la
+  sirène ne signale pas la fin d'un délai (arrachée, hors de portée),
+  l'alarme avance quand même. Une alarme déclenchée ne se quitte que par
+  un désarmement.
 - **Mode `alarmo`** : Alarmo décide, la sirène suit son état, armée en
   miroir. Réglez les délais d'openqiara comme ceux d'Alarmo.
+- Dans les deux modes, openqiarad ramène la sirène à l'état voulu à
+  chacun de ses rapports : réarmée si elle a redémarré, désarmée si elle
+  est armée à tort. Juste après un démarrage, il la laisse telle quelle
+  tant que l'alarme n'a pas dit ce qu'elle veut : elle peut porter une
+  alarme survenue pendant la panne.
 - **Si la caméra tombe** (panne, Wi-Fi, openqiarad arrêté), les capteurs
   s'adressent directement à la sirène armée, qui déclenche seule.
   Désarmée, elle ne fait rien.

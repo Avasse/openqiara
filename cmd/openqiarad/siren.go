@@ -8,9 +8,9 @@ import (
 	"github.com/caligone/openqiara/internal/config"
 )
 
-// nativeSiren drives the paired siren for the alarm, the standalone engine
-// (alarm.Siren) and the mirror of Alarmo alike: armed with the delays and
-// the sensors of the config, the siren keeps the alarm by itself.
+// nativeSiren is the paired siren on the radio (alarm.SirenRadio), behind
+// alarm.SirenDriver: armed with the delays and the sensors of the config,
+// the siren keeps the alarm by itself.
 type nativeSiren struct {
 	ctx   context.Context
 	cam   camera.Client
@@ -26,17 +26,6 @@ func (s nativeSiren) id() int {
 		}
 	}
 	return 0
-}
-
-// State is what the siren last reported (camera.Sensor.SirenState).
-func (s nativeSiren) State() string {
-	id := s.id()
-	for _, se := range s.cam.CachedSensors() {
-		if se.ID == id {
-			return se.SirenState
-		}
-	}
-	return ""
 }
 
 // Present tells whether a siren keeps the alarm: siren_sounds none leaves
@@ -92,3 +81,6 @@ func (s nativeSiren) Alert() error { return s.cam.SirenAlert(s.ctx, s.id()) }
 func (s nativeSiren) Wail() error {
 	return s.cam.TriggerSirenAlarm(s.ctx, s.id(), s.store.Get().WailDuration())
 }
+
+// RequestState asks the siren for its state, which comes back as a report.
+func (s nativeSiren) RequestState() error { return s.cam.RequestSirenState(s.ctx, s.id()) }
