@@ -247,11 +247,24 @@ func TestRadioSirenNative(t *testing.T) {
 		t.Error("a door was armed as a siren")
 	}
 
-	// Its state reports come out as events.
-	mcu.rx(charmux.ManagedFrame{GWDst: 1, GWSrc: 6, Counter: 50, Src: 6, Flags: 0x0086, WFlags: 0x01,
-		Payload: []byte{0x55, 0x01, 1, 2, 3, 4, 0, 0x04}})
-	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.SirenState != "entry_delay" || !ev.SirenReport {
-		t.Errorf("event = %+v, want siren 29 in its entry delay", ev)
+	// Its state reports come out as events; one that arrives after a later
+	// one, as on the hardware, is dropped.
+	report := func(counter uint32, state byte) {
+		mcu.rx(charmux.ManagedFrame{GWDst: 1, GWSrc: 6, Counter: counter, Src: 6, Flags: 0x0086, WFlags: 0x01,
+			Payload: []byte{0x55, 0x01, 1, 2, 3, 4, 0, state}})
+	}
+	report(1000, 0x05)
+	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.SirenState != "alert" || !ev.SirenReport {
+		t.Errorf("event = %+v, want siren 29 in alert", ev)
+	}
+	report(999, 0x03) // the answer to an earlier command
+	report(1001, 0x06)
+	if ev := nextEvent(t, c); ev.Sensor.SirenState != "alert_over" {
+		t.Errorf("event = %+v, want the stale report dropped, then alert_over", ev)
+	}
+	report(5, 0x00) // far behind: counting again from the start
+	if ev := nextEvent(t, c); ev.Sensor.SirenState != "off" {
+		t.Errorf("event = %+v, want off", ev)
 	}
 }
 

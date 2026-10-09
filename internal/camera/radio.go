@@ -58,8 +58,11 @@ type RadioClient struct {
 	ids     map[uint32]int     // radio address → id
 	known   map[int]bool       // door or motion state reported since start
 	heard   map[int]time.Time  // last frame from the sensor, or when it began to be served
-	pairing *pairing
-	failed  int // pairings that failed since the last success
+	// sirenCounter is the counter of the siren's last frame, to drop its
+	// answers that arrive out of order.
+	sirenCounter map[int]uint32
+	pairing      *pairing
+	failed       int // pairings that failed since the last success
 }
 
 // radioMCU is the part of charmux.Client the radio client uses.
@@ -113,14 +116,15 @@ var errRadioStopped = errors.New("radio: gateway stopped")
 func NewRadioClient(mcu radioMCU, store *config.Store, log *slog.Logger) *RadioClient {
 	return &RadioClient{
 		mcu: mcu, store: store, log: log,
-		KeysPath:    "/etc/hl/vendors.keys",
-		ManifestDir: "/etc/hl",
-		BytecodeDir: "/lib/firmwares/bytecode",
-		FbxhomeXML:  fbxhomeXMLGlob,
-		events:      make(chan SensorEvent, 64),
-		done:        make(chan struct{}),
-		known:       make(map[int]bool),
-		heard:       make(map[int]time.Time),
+		KeysPath:     "/etc/hl/vendors.keys",
+		ManifestDir:  "/etc/hl",
+		BytecodeDir:  "/lib/firmwares/bytecode",
+		FbxhomeXML:   fbxhomeXMLGlob,
+		events:       make(chan SensorEvent, 64),
+		done:         make(chan struct{}),
+		known:        make(map[int]bool),
+		heard:        make(map[int]time.Time),
+		sirenCounter: make(map[int]uint32),
 	}
 }
 
@@ -319,13 +323,36 @@ func (c *RadioClient) receive(data []byte) {
 		c.sensors[id] = s
 		c.heard[id] = time.Now()
 	}
-	_ = c.send(c.engine.Receive(time.Now(), *rx))
+	res := c.engine.Receive(time.Now(), *rx)
+	if c.staleSiren(id, *rx) {
+		// An answer to an earlier command, overtaken by a later one: its
+		// state is no longer the siren's.
+		res.Events = slices.DeleteFunc(res.Events, func(e radio.Event) bool { return e.Kind == radio.SirenState })
+	}
+	_ = c.send(res)
 	if back {
 		// Published after the frame's own events: before, it would repeat
 		// the state the sensor had when it went missing, and a repeated
 		// open is an intrusion to the alarm.
 		c.emit(c.sensors[id])
 	}
+}
+
+// staleSiren tells whether a siren frame is older than the last one heard:
+// the siren answers commands sent back to back out of order (hardware,
+// 2026-10-09: counters 27432, 27433 then 27431). A counter far behind is
+// a siren that started counting again, not an old frame. Called with mu
+// held.
+func (c *RadioClient) staleSiren(id int, rx charmux.ManagedFrame) bool {
+	if n, ok := c.nodes[id]; !ok || n.Model != radio.SRN || rx.Flags&(charmux.FlagZ|charmux.FlagW|charmux.FlagA) == 0 {
+		return false
+	}
+	last, seen := c.sirenCounter[id]
+	if seen && last-rx.Counter > 0 && last-rx.Counter < 256 {
+		return true
+	}
+	c.sirenCounter[id] = rx.Counter
+	return false
 }
 
 // markSilent shows unreachable the sensors silent past their limit.
