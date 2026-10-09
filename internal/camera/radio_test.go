@@ -236,9 +236,9 @@ func TestRadioSirenNative(t *testing.T) {
 	}
 	send(c.ArmSiren(ctx, 29, SirenArming{ExitDelay: 10 * time.Second, EntryDelay: 300 * time.Second,
 		Alert: 7 * time.Second, Active: []int{23, 14, 99}, Delayed: []int{23}}),
-		[]byte{0x55, 0x04, 10, 255, 4, 0x05, 0x64, 0x02, 0, 0, 0, 0, 0, 0, 0, 0x05, 0, 0, 0, 0, 0, 0, 0, 0x04})
+		[]byte{0x55, 0x04, 10, 255, 4, 0x05, 0x64, 0x02, 0, 0, 0, 0, 0, 0, 0, 0x05, 0, 0, 0, 0, 0, 0, 0, 0x04}, []byte{0x55, 0x06})
 	send(c.ArmSiren(ctx, 29, SirenArming{Quiet: true}),
-		[]byte{0x55, 0x04, 0, 0, 0, 0, 0x64, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+		[]byte{0x55, 0x04, 0, 0, 0, 0, 0x64, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, []byte{0x55, 0x06})
 	send(c.SirenEntryDelay(ctx, 29), []byte{0x55, 0x05, 0x04})
 	send(c.SirenAlert(ctx, 29), []byte{0x55, 0x05, 0x05})
 	send(c.StopSiren(ctx, 29), []byte{0x55, 0x05, 0x00})
@@ -250,7 +250,7 @@ func TestRadioSirenNative(t *testing.T) {
 	// Its state reports come out as events.
 	mcu.rx(charmux.ManagedFrame{GWDst: 1, GWSrc: 6, Counter: 50, Src: 6, Flags: 0x0086, WFlags: 0x01,
 		Payload: []byte{0x55, 0x01, 1, 2, 3, 4, 0, 0x04}})
-	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.SirenState != "entry_delay" {
+	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.SirenState != "entry_delay" || !ev.SirenReport {
 		t.Errorf("event = %+v, want siren 29 in its entry delay", ev)
 	}
 }

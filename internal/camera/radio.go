@@ -426,7 +426,10 @@ func (c *RadioClient) publish(ev radio.Event) {
 		c.log.Warn("radio: keypad emergency button, not handled", "id", id)
 	case radio.SirenState:
 		c.log.Info("radio: siren state", "id", id, "state", ev.Value)
-		s.SirenState, report = sirenStates[ev.Value], true
+		s.SirenState = sirenStates[ev.Value]
+		c.sensors[id] = s
+		c.event(SensorEvent{SensorID: id, Sensor: s, SirenReport: true})
+		return
 	case radio.Rebooted:
 		c.log.Info("radio: sensor rebooted, provisioning it", "id", id)
 	case radio.Unhandled:
@@ -457,13 +460,17 @@ func (c *RadioClient) saveBattery(id, level int) {
 
 // emit publishes a sensor's state. Called with mu held.
 func (c *RadioClient) emit(s Sensor) {
+	c.event(SensorEvent{SensorID: s.ID, Sensor: s})
+}
+
+func (c *RadioClient) event(ev SensorEvent) {
 	if c.closed {
 		return
 	}
 	select {
-	case c.events <- SensorEvent{SensorID: s.ID, Sensor: s}:
+	case c.events <- ev:
 	default:
-		c.log.Warn("radio: event channel full, dropping event", "id", s.ID)
+		c.log.Warn("radio: event channel full, dropping event", "id", ev.SensorID)
 	}
 }
 
@@ -761,7 +768,7 @@ func sirenSeconds(d time.Duration, unit time.Duration) byte {
 }
 
 // ArmSiren arms the siren, which must be off: it ignores the frame
-// otherwise.
+// otherwise. Its state is asked for after.
 func (c *RadioClient) ArmSiren(_ context.Context, id int, a SirenArming) error {
 	addr, err := c.sirenAddr(id)
 	if err != nil {
@@ -781,7 +788,8 @@ func (c *RadioClient) ArmSiren(_ context.Context, id int, a SirenArming) error {
 		sirenSeconds(a.Alert, 2*time.Second), beeps, 0x64, target}
 	f = binary.BigEndian.AppendUint64(f, active)
 	f = binary.BigEndian.AppendUint64(f, delayed)
-	return c.command(addr, f)
+	// Its state, whether it took the arming or not.
+	return errors.Join(c.command(addr, f), c.command(addr, sirenGetState))
 }
 
 // mask sets one bit per system index of the sensors served. Called with
@@ -820,7 +828,10 @@ func (c *RadioClient) RelaySensorAlarm(_ context.Context, id, sensorID int) erro
 	if !ok {
 		return fmt.Errorf("radio: no paired sensor %d", sensorID)
 	}
-	report := []byte{0x55, 0x01, 0, 0, 0, 0, 0x40 | n.SystemIndex&0x3f, 0}
+	if n.SystemIndex >= 64 {
+		return fmt.Errorf("radio: sensor %d has no index the siren takes", sensorID)
+	}
+	report := []byte{0x55, 0x01, 0, 0, 0, 0, 0x40 | n.SystemIndex, 0}
 	return errors.Join(c.command(addr, report), c.command(addr, sirenGetState))
 }
 

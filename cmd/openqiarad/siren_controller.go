@@ -36,6 +36,8 @@ type sirenController struct {
 	mu        sync.Mutex
 	alarmo    string // Alarmo's last state
 	lastRearm time.Time
+	expectOff int   // "off" reports our own disarming will bring
+	night     *bool // the mode we armed the siren for, nil if unknown
 
 	synchronous bool // tests only
 	queue       chan func()
@@ -79,9 +81,17 @@ func (s *sirenController) Handle(newState, prevState string) {
 		case newState == "arming":
 			err = s.siren.Arm(false, true)
 		case armedState(newState):
+			night := nightStates[newState]
+			if s.keepArmed(night) {
+				return
+			}
 			// An armed siren takes no new arming: off first (silent).
+			s.mu.Lock()
+			s.expectOff++
+			s.night = &night
+			s.mu.Unlock()
 			if err = s.siren.Disarm(); err == nil {
-				err = s.siren.Arm(nightStates[newState], false)
+				err = s.siren.Arm(night, false)
 			}
 		case newState == "pending":
 			err = s.siren.EntryDelay()
@@ -99,12 +109,36 @@ func (s *sirenController) Handle(newState, prevState string) {
 	})
 }
 
+// keepArmed tells whether the siren already holds the armed mode: armed for
+// it, or for a mode not known (openqiarad restarted), or in the middle of
+// an alarm it saw while openqiarad was down, which re-arming would erase.
+func (s *sirenController) keepArmed(night bool) bool {
+	switch s.siren.State() {
+	case "entry_delay", "alert", "alert_over":
+		return true
+	case "armed":
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.night == nil {
+			s.night = &night
+			return true
+		}
+		return *s.night == night
+	}
+	return false
+}
+
 // SirenState reconciles the siren with Alarmo: armed while Alarmo is
 // disarmed, it is disarmed; off while Alarmo is armed (it rebooted), it is
 // armed again, at once and not more than every rearmEvery.
 func (s *sirenController) SirenState(state string) {
 	s.mu.Lock()
 	alarmo := s.alarmo
+	if state == "off" && s.expectOff > 0 {
+		s.expectOff-- // our own disarming, before an arming
+		s.mu.Unlock()
+		return
+	}
 	rearm := alarmo != "disarmed" && alarmo != "" && state == "off" && time.Since(s.lastRearm) > rearmEvery
 	if rearm {
 		s.lastRearm = time.Now()

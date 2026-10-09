@@ -23,6 +23,9 @@ type Sensor struct {
 type SensorEvent struct {
 	SensorID int
 	Sensor   Sensor
+	// SirenReport: the siren just reported its state (Sensor.SirenState);
+	// other events of a siren carry its last report.
+	SirenReport bool
 }
 
 // NodeType maps sensor short types to the model prefix of their pairing

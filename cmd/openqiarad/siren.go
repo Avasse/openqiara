@@ -53,8 +53,13 @@ func (s nativeSiren) Relay(sensorID int) error {
 	return s.cam.RelaySensorAlarm(s.ctx, s.id(), sensorID)
 }
 
+// Disarm disarms the siren if there is one, siren_sounds none included.
 func (s nativeSiren) Disarm() error {
-	return s.cam.StopSiren(s.ctx, s.id())
+	id := s.id()
+	if id == 0 {
+		return nil
+	}
+	return s.cam.StopSiren(s.ctx, id)
 }
 
 // arming is the config as the siren takes it: the doors and motion sensors

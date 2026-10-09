@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 )
 
 // fakeSiren records what the engine asks of the siren.
@@ -27,6 +28,7 @@ func (f *fakeSiren) Arm(night, delayed bool) error {
 }
 func (f *fakeSiren) Relay(id int) error { f.calls = append(f.calls, "relay"); return nil }
 func (f *fakeSiren) Disarm() error      { f.calls = append(f.calls, "disarm"); return nil }
+func (f *fakeSiren) Wail() error        { f.calls = append(f.calls, "wail"); return nil }
 
 // take returns the calls since the last take.
 func (f *fakeSiren) take() []string {
@@ -125,6 +127,20 @@ func TestWhatIsNotRelayed(t *testing.T) {
 	expect(t, e, siren, StateArmedAway, "relay")
 }
 
+// TestModeSwitchOffNotARestart: the "off" our own disarming brings on a
+// change of mode is not a rebooted siren; a real one later is re-armed.
+func TestModeSwitchOffNotARestart(t *testing.T) {
+	e, siren := newTestEngine(t, nil)
+	e.HandleCommand("arm_away", SourceRemote)
+	e.HandleCommand("arm_night", SourceRemote)
+	siren.take()
+	e.HandleSirenState(SirenOff)
+	e.HandleSirenState(SirenArmed)
+	expect(t, e, siren, StateArmedNight)
+	e.HandleSirenState(SirenOff)
+	expect(t, e, siren, StateArmedNight, "arm night")
+}
+
 // TestSirenReconciled: a siren armed while the alarm is disarmed is
 // disarmed; one found off while armed (it rebooted) is armed again, once.
 func TestSirenReconciled(t *testing.T) {
@@ -142,16 +158,56 @@ func TestSirenReconciled(t *testing.T) {
 	expect(t, e, siren, StateArmedAway)
 }
 
-// TestNoSiren: without a siren, the alarm arms and goes off at once.
+// TestNoSiren: without a siren (or with siren_sounds none), the engine
+// counts the delays itself; a siren that exists is still disarmed.
 func TestNoSiren(t *testing.T) {
-	e, siren := newTestEngine(t, nil)
+	e, siren := newTestEngine(t, map[int]SensorConfig{30: {Instant: true}})
 	siren.absent = true
+	e.SetTimings(20*time.Millisecond, 20*time.Millisecond)
 	e.HandleCommand("arm_away", SourceLocal)
+	expect(t, e, siren, StateArming)
+	time.Sleep(60 * time.Millisecond)
 	expect(t, e, siren, StateArmedAway)
+
 	e.HandleSensorEvent(23, "DWS", true)
+	expect(t, e, siren, StatePending)
+	time.Sleep(60 * time.Millisecond)
 	expect(t, e, siren, StateTriggered)
 	e.HandleCommand("disarm", SourceLocal)
-	expect(t, e, siren, StateDisarmed)
+	expect(t, e, siren, StateDisarmed, "disarm")
+
+	e.HandleCommand("arm_away", SourceRemote)
+	e.HandleSensorEvent(30, "DWS", true)
+	expect(t, e, siren, StateTriggered)
+	e.HandleCommand("disarm", SourceLocal)
+	siren.take()
+
+	// A disarm stops the entry delay's timer.
+	e.HandleCommand("arm_away", SourceRemote)
+	e.HandleSensorEvent(23, "DWS", true)
+	e.HandleCommand("disarm", SourceLocal)
+	time.Sleep(60 * time.Millisecond)
+	expect(t, e, siren, StateDisarmed, "disarm")
+}
+
+// TestMuteSiren: a relayed alarm the siren does not answer sets the alarm
+// off without it; an answer, whatever it is, leaves it to the siren.
+func TestMuteSiren(t *testing.T) {
+	defer func(d time.Duration) { relayTimeout = d }(relayTimeout)
+	relayTimeout = 20 * time.Millisecond
+
+	e, siren := newTestEngine(t, nil)
+	e.HandleCommand("arm_away", SourceRemote)
+	e.HandleSensorEvent(23, "DWS", true)
+	time.Sleep(60 * time.Millisecond)
+	expect(t, e, siren, StateTriggered, "arm", "relay", "wail")
+
+	e.HandleCommand("disarm", SourceLocal)
+	e.HandleCommand("arm_away", SourceRemote)
+	e.HandleSensorEvent(23, "DWS", true)
+	e.HandleSirenState(SirenArmed) // not in its masks: it stays armed
+	time.Sleep(60 * time.Millisecond)
+	expect(t, e, siren, StateArmedAway, "disarm", "arm", "relay")
 }
 
 // TestLoad: the state comes back as it was, the mode with it; the siren's

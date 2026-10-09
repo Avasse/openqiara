@@ -76,7 +76,7 @@ type AlarmConfig struct {
 	PendingDelaySeconds int `json:"pending_delay_seconds,omitempty"`
 
 	// WailDurationSeconds is how long the alert lasts, counted by the siren
-	// in 2 s steps, 510 s at most (default 3s). 0 means "use default".
+	// in 2 s steps, 510 s at most (default 300 s). 0 means "use default".
 	WailDurationSeconds int `json:"wail_duration_seconds,omitempty"`
 }
 
@@ -84,7 +84,7 @@ type AlarmConfig struct {
 const (
 	DefaultArmingDelaySeconds  = 60
 	DefaultPendingDelaySeconds = 60
-	DefaultWailDurationSeconds = 3
+	DefaultWailDurationSeconds = 300 // fbxhome's
 )
 
 // ArmingDelay returns the configured arming delay, falling back to default.

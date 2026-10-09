@@ -696,7 +696,7 @@ func forwardEvents(
 				if webSrv != nil {
 					webSrv.PublishEvent("sensor", evt.Sensor)
 				}
-				if evt.Sensor.Type == "SRN" && evt.Sensor.SirenState != "" {
+				if evt.SirenReport {
 					onSirenState(evt.Sensor.SirenState)
 				}
 				// Only feed the local alarm engine in standalone mode.

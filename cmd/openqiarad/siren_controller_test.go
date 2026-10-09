@@ -109,10 +109,28 @@ func TestMirrorReconciled(t *testing.T) {
 
 	sc.Handle("armed_night", "disarmed")
 	siren.take()
-	sc.SirenState("off")
+	sc.SirenState("off") // our own disarming, before the arming
+	sc.SirenState("armed")
+	expectCalls(t, siren)
+	sc.SirenState("off") // it rebooted
 	expectCalls(t, siren, "arm night")
 	sc.SirenState("off")
 	expectCalls(t, siren)
-	sc.SirenState("armed")
-	expectCalls(t, siren)
+}
+
+// TestMirrorKeepsWhatTheSirenHolds: Alarmo's retained state after a
+// restart does not re-arm a siren that already holds it, nor erase an
+// alarm it saw meanwhile.
+func TestMirrorKeepsWhatTheSirenHolds(t *testing.T) {
+	for _, state := range []string{"armed", "entry_delay", "alert", "alert_over"} {
+		siren := &fakeSiren{state: state}
+		sc := newTestController(siren)
+		sc.Handle("armed_away", "")
+		expectCalls(t, siren)
+	}
+	siren := &fakeSiren{state: "armed"}
+	sc := newTestController(siren)
+	sc.Handle("armed_away", "")
+	sc.Handle("armed_night", "armed_away")
+	expectCalls(t, siren, "disarm", "arm night")
 }

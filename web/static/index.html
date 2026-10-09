@@ -788,7 +788,7 @@ async function loadConfig() {
       document.getElementById('cfg-siren-sounds').value = d.alarm.siren_sounds || 'all';
       document.getElementById('cfg-arming-delay').value = d.alarm.arming_delay_seconds ?? 60;
       document.getElementById('cfg-pending-delay').value = d.alarm.pending_delay_seconds ?? 60;
-      document.getElementById('cfg-wail-duration').value = d.alarm.wail_duration_seconds ?? 3;
+      document.getElementById('cfg-wail-duration').value = d.alarm.wail_duration_seconds ?? 300;
       window.currentAlarmMode = mode;
     }
     const alarmMode = (d.alarm && d.alarm.mode) || 'standalone';

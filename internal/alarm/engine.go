@@ -4,7 +4,9 @@
 // exit and entry delays, plays their beeps and wails, and it hears the
 // sensors itself when the gateway is gone. The engine arms and disarms it,
 // relays it the sensors' alarms, and takes its state from what the siren
-// reports. Without a siren, the engine arms at once and goes off at once.
+// reports. A relayed alarm the siren does not answer within relayTimeout
+// sets the alarm off here. Without a siren (or with siren_sounds none),
+// the engine counts the delays itself.
 //
 // The engine also keeps what the siren does not know: the mode (away or
 // night), when it was armed and which sensor set it off. That and the
@@ -43,6 +45,11 @@ const (
 // rearmEvery spaces out the re-arming of a siren found off while the alarm
 // is armed (it rebooted): a siren that keeps refusing does not loop.
 const rearmEvery = 30 * time.Second
+
+// relayTimeout is how long a relayed alarm waits for the siren's report
+// before the alarm goes off without it (a mute or unreachable siren). A
+// variable for the tests.
+var relayTimeout = 10 * time.Second
 
 // persistedState is the on-disk representation.
 type persistedState struct {
@@ -91,8 +98,11 @@ type Siren interface {
 	// Relay hands it a sensor's alarm: it starts the entry delay or the
 	// alert by itself.
 	Relay(sensorID int) error
-	// Disarm disarms it and stops its sound.
+	// Disarm disarms it and stops its sound, whether it keeps the alarm or
+	// not (siren_sounds none): it must never stay armed.
 	Disarm() error
+	// Wail plays its sound, when the alarm goes off without it.
+	Wail() error
 }
 
 // SirenState is a state the siren reports.
@@ -117,6 +127,9 @@ type Engine struct {
 	trigBy    int
 	deadline  time.Time // end of the delay in progress, for display
 	lastRearm time.Time
+	sirenSeen time.Time // last report of the siren
+	expectOff int       // "off" reports our own disarming will bring
+	timerGen  int       // bumped by every transition: stale timers do nothing
 
 	armingDelay  time.Duration
 	pendingDelay time.Duration
@@ -196,6 +209,9 @@ func (e *Engine) Load() error {
 	default:
 		e.state = StateDisarmed
 	}
+	if !e.hasSiren() && (e.state == StateArming || e.state == StatePending) {
+		e.state = mode // its timer died with the process
+	}
 	e.logger.Info("alarm: state loaded", "state", e.state, "mode", e.mode)
 	return nil
 }
@@ -234,7 +250,7 @@ func (e *Engine) HandleCommand(cmd string, source Source) {
 			return
 		}
 		e.transitionLocked(StateDisarmed, "user disarm")
-		if e.hasSiren() {
+		if e.siren != nil {
 			e.sirenErr("disarm", e.siren.Disarm())
 		}
 
@@ -254,6 +270,7 @@ func (e *Engine) HandleCommand(cmd string, source Source) {
 			e.mode = mode
 			e.transitionLocked(mode, "switch mode")
 			if e.hasSiren() {
+				e.expectOff++
 				e.sirenErr("disarm", e.siren.Disarm())
 				e.sirenErr("arm", e.siren.Arm(mode == StateArmedNight, false))
 			}
@@ -270,8 +287,16 @@ func (e *Engine) HandleCommand(cmd string, source Source) {
 func (e *Engine) armLocked(mode State, delayed bool) {
 	e.mode, e.trigBy = mode, 0
 	if !e.hasSiren() {
-		// Nobody to count the exit delay: armed at once.
-		e.armedLocked("armed, no siren")
+		if !delayed {
+			e.armedLocked("armed, no siren")
+			return
+		}
+		e.transitionLocked(StateArming, "arming, no siren")
+		e.afterLocked(e.armingDelay, func() {
+			if e.state == StateArming {
+				e.armedLocked("exit delay over")
+			}
+		})
 		return
 	}
 	// Armed before anything is relayed to it: an unarmed siren ignores it.
@@ -319,19 +344,58 @@ func (e *Engine) watchedLocked(sensorID int) bool {
 }
 
 // sensorAlarmLocked hands a sensor's alarm to the siren, which decides and
-// reports; without a siren, the alarm goes off at once.
+// reports; a siren that stays mute leaves the alarm to go off here.
+// Without a siren, the engine runs the entry delay itself.
 func (e *Engine) sensorAlarmLocked(sensorID int) {
 	e.logger.Info("alarm: sensor in alarm", "sensor_id", sensorID, "state", e.state)
-	if e.state == StateArmedAway || e.state == StateArmedNight {
+	armed := e.state == StateArmedAway || e.state == StateArmedNight
+	if armed {
 		e.trigBy = sensorID
 	}
 	if !e.hasSiren() {
-		if e.state != StateTriggered {
-			e.transitionLocked(StateTriggered, "sensor, no siren")
-		}
+		e.localAlarmLocked(armed, e.configFor(sensorID).Instant)
 		return
 	}
 	e.sirenErr("relay", e.siren.Relay(sensorID))
+	if armed {
+		relayed := time.Now()
+		e.afterLocked(relayTimeout, func() {
+			if e.sirenSeen.Before(relayed) && (e.state == StateArmedAway || e.state == StateArmedNight) {
+				e.logger.Error("alarm: the siren did not answer a sensor's alarm, going off without it", "sensor_id", sensorID)
+				e.transitionLocked(StateTriggered, "siren mute")
+				e.sirenErr("wail", e.siren.Wail())
+			}
+		})
+	}
+}
+
+// localAlarmLocked runs the entry delay and the alert without a siren.
+func (e *Engine) localAlarmLocked(armed, instant bool) {
+	switch {
+	case e.state == StateTriggered:
+	case instant:
+		e.transitionLocked(StateTriggered, "sensor, no siren")
+	case armed:
+		e.transitionLocked(StatePending, "entry delay, no siren")
+		e.afterLocked(e.pendingDelay, func() {
+			if e.state == StatePending {
+				e.transitionLocked(StateTriggered, "entry delay over")
+			}
+		})
+	}
+}
+
+// afterLocked runs fn under the lock after d, unless the state changed in
+// the meantime.
+func (e *Engine) afterLocked(d time.Duration, fn func()) {
+	gen := e.timerGen
+	time.AfterFunc(d, func() {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		if e.timerGen == gen {
+			fn()
+		}
+	})
 }
 
 // HandleSirenState takes the siren's report as the alarm's state. A siren
@@ -343,10 +407,15 @@ func (e *Engine) HandleSirenState(s SirenState) {
 	if !e.hasSiren() {
 		return
 	}
+	e.sirenSeen = time.Now()
 
 	var next State
 	switch s {
 	case SirenOff:
+		if e.expectOff > 0 {
+			e.expectOff-- // our own disarming, on a change of mode
+			return
+		}
 		if e.state != StateDisarmed && time.Since(e.lastRearm) > rearmEvery {
 			e.lastRearm = time.Now()
 			e.logger.Warn("alarm: siren found off while armed, arming it again", "state", e.state)
@@ -394,6 +463,7 @@ func (e *Engine) transitionLocked(newState State, reason string) {
 	old := e.state
 	e.state = newState
 	e.deadline = time.Time{}
+	e.timerGen++
 	switch newState {
 	case StateDisarmed:
 		e.armedAt, e.trigBy, e.mode = 0, 0, ""
