@@ -49,7 +49,7 @@ func TestDriverLeavesTheSirenUntilTold(t *testing.T) {
 }
 
 // TestDriverArming: armed from off; an arming while its state is not known
-// waits for its report; a siren holding an alarm keeps it; one armed for
+// waits for its report, exit delay kept; a siren holding an alarm keeps it; one armed for
 // another mode, or for a mode not known, is armed again.
 func TestDriverArming(t *testing.T) {
 	r := &fakeRadio{}
@@ -57,7 +57,8 @@ func TestDriverArming(t *testing.T) {
 	d.Arm(false, true)
 	sent(t, r, "state?")
 	d.HandleReport(SirenOff)
-	sent(t, r, "arm")
+	sent(t, r, "arm delayed") // the arming that waited keeps its exit delay
+	d.HandleReport(SirenArmed)
 
 	d.HandleReport(SirenArmed)
 	d.Arm(false, false)

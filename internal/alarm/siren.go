@@ -39,10 +39,12 @@ type SirenDriver struct {
 
 	mu        sync.Mutex
 	want      sirenWant
-	night     bool        // the mode wanted, when armed
-	armed     *bool       // the mode the siren was last armed with, nil if not known
-	last      SirenState  // its last report, "" before the first
+	night     bool       // the mode wanted, when armed
+	armed     *bool      // the mode the siren was last armed with, nil if not known
+	last      SirenState // its state as last reported, or as our last command leaves it; "" not known
+	delayed   *bool      // an arming waiting for the first report, and whether with the exit delay
 	lastRearm time.Time
+	retrying  bool // a re-arming put off by rearmEvery is due
 }
 
 type sirenWant int
@@ -77,7 +79,8 @@ func (d *SirenDriver) Arm(night, delayed bool) {
 	}
 	switch d.last {
 	case "":
-		d.err("state", d.radio.RequestState()) // armed on its report
+		d.delayed = &delayed // armed on its first report
+		d.err("state", d.radio.RequestState())
 	case SirenEntryDelay, SirenAlert, SirenAlertOver:
 	case SirenArmed, SirenExitDelay:
 		if d.armed != nil && *d.armed == night && (!delayed || d.last == SirenExitDelay) {
@@ -90,9 +93,38 @@ func (d *SirenDriver) Arm(night, delayed bool) {
 	}
 }
 
+// rearmLocked arms again a siren found off, at once and not more than
+// every rearmEvery: put off, it asks the siren's state again when due.
+func (d *SirenDriver) rearmLocked() {
+	if wait := rearmEvery - time.Since(d.lastRearm); wait > 0 {
+		if !d.retrying {
+			d.retrying = true
+			time.AfterFunc(wait, func() {
+				d.mu.Lock()
+				defer d.mu.Unlock()
+				d.retrying = false
+				if d.want == wantArmed {
+					d.err("state", d.radio.RequestState())
+				}
+			})
+		}
+		return
+	}
+	d.lastRearm = time.Now()
+	d.logger.Warn("siren: off while it should be armed, arming it", "night", d.night)
+	d.armLocked(false)
+}
+
+// armLocked arms the siren, which is off or about to be: our commands go
+// out in order. Its state is taken as the one the arming leaves, until a
+// report says otherwise.
 func (d *SirenDriver) armLocked(delayed bool) {
 	night := d.night
-	d.armed = &night
+	d.armed, d.delayed = &night, nil
+	d.last = SirenArmed
+	if delayed {
+		d.last = SirenExitDelay
+	}
 	d.err("arm", d.radio.Arm(night, delayed))
 }
 
@@ -101,7 +133,8 @@ func (d *SirenDriver) armLocked(delayed bool) {
 func (d *SirenDriver) Disarm() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.want, d.armed = wantOff, nil
+	d.want, d.armed, d.delayed = wantOff, nil, nil
+	d.last = SirenOff // it takes a disarm in any state
 	d.err("disarm", d.radio.Disarm())
 }
 
@@ -137,10 +170,10 @@ func (d *SirenDriver) HandleReport(s SirenState) {
 	case d.want == wantOff && s != SirenOff && s != SirenTest:
 		d.logger.Warn("siren: armed while it should be off, disarming it", "siren", s)
 		d.err("disarm", d.radio.Disarm())
-	case d.want == wantArmed && s == SirenOff && time.Since(d.lastRearm) > rearmEvery:
-		d.lastRearm = time.Now()
-		d.logger.Warn("siren: off while it should be armed, arming it", "night", d.night)
-		d.armLocked(false)
+	case d.want == wantArmed && s == SirenOff && d.delayed != nil:
+		d.armLocked(*d.delayed) // the arming that waited for this report
+	case d.want == wantArmed && s == SirenOff:
+		d.rearmLocked()
 	}
 }
 
