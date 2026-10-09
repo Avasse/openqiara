@@ -144,6 +144,19 @@ func TestMarshalState_SRN(t *testing.T) {
 	if !got.Reachable {
 		t.Error("expected reachable=true")
 	}
+	if got.Active || got.State != "" {
+		t.Errorf("active = %v, state = %q: a siren that reported nothing is off", got.Active, got.State)
+	}
+
+	// Active while it wails only; an alarm over keeps its state.
+	for state, active := range map[string]bool{"alert": true, "alert_over": false, "armed": false} {
+		data, _ := marshalState(camera.Sensor{ID: 1, Type: "SRN", SirenState: state})
+		var got srnState
+		_ = json.Unmarshal(data, &got)
+		if got.Active != active || got.State != state {
+			t.Errorf("%s: got %+v, want active %v", state, got, active)
+		}
+	}
 }
 
 func TestMarshalState_KPD(t *testing.T) {

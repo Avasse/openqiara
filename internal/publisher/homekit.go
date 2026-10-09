@@ -145,6 +145,12 @@ func (p *HomeKitPublisher) PublishSensorState(ctx context.Context, sensor camera
 		if a, ok := p.motions[sensor.ID]; ok {
 			a.MotionSensor.MotionDetected.SetValue(sensor.Motion)
 		}
+	case "SRN":
+		// On while it wails, whoever set it off (openqiara, Alarmo, or the
+		// siren itself while the camera was down).
+		if a, ok := p.switches[sensor.ID]; ok {
+			a.Switch.On.SetValue(sensor.SirenState == "alert")
+		}
 	}
 	return nil
 }

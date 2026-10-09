@@ -366,16 +366,6 @@ func (p *HAPublisher) SetupSirenCommandHandler(sensors []camera.Sensor, callback
 	}
 }
 
-// PublishSirenState publishes the siren active state.
-func (p *HAPublisher) PublishSirenState(ctx context.Context, sensorID int, active bool) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	payload, _ := json.Marshal(srnState{Active: active})
-	topic := stateTopic(p.prefix, sensorID)
-	return p.publish(ctx, topic, payload, retained)
-}
-
 // Prefix returns the configured topic prefix.
 func (p *HAPublisher) Prefix() string {
 	return p.prefix
@@ -449,7 +439,7 @@ func marshalState(s camera.Sensor) ([]byte, error) {
 	case "PIR":
 		v = pirState{Motion: s.Motion, Battery: s.Battery, Reachable: s.Reachable}
 	case "SRN":
-		v = srnState{Active: false, Battery: s.Battery, Reachable: s.Reachable}
+		v = srnState{Active: s.SirenState == "alert", State: s.SirenState, Battery: s.Battery, Reachable: s.Reachable}
 	case "KPD":
 		v = kpdState{Battery: s.Battery, Reachable: s.Reachable}
 	default:

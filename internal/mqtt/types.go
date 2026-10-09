@@ -41,9 +41,10 @@ type pirState struct {
 
 // srnState is the MQTT state payload for a siren.
 type srnState struct {
-	Active    bool `json:"active"`
-	Battery   int  `json:"battery"`
-	Reachable bool `json:"reachable"`
+	Active    bool   `json:"active"`          // wailing
+	State     string `json:"state,omitempty"` // as the siren reports it (camera.Sensor.SirenState)
+	Battery   int    `json:"battery"`
+	Reachable bool   `json:"reachable"`
 }
 
 // kpdState is the MQTT state payload for a keypad event.

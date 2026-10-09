@@ -94,10 +94,19 @@ State:   {"motion": true, "battery": 255, "reachable": true}
 ```
 Topic:     homeassistant/siren/openqiara_<ID>/config
 Command:   openqiara/siren/<ID>/set   (payload: "true"/"false" ou "ON"/"OFF")
-State:     openqiara/sensor/<ID>/state  {"active": false, "battery": 35, "reachable": true}
+State:     openqiara/sensor/<ID>/state  {"active": false, "state": "armed", "battery": 81, "reachable": true}
 ```
 
-HA envoie `true`/`ON` → `cam.TriggerSirenAlarm`. HA envoie `false`/`OFF` → `cam.StopSiren`.
+`active` est vrai quand la sirène hurle, quel que soit le déclencheur :
+openqiara, Alarmo, ou la sirène elle-même pendant une panne de la caméra.
+`state` (attribut) est l'état qu'elle rapporte : `off`, `test`,
+`exit_delay`, `armed`, `entry_delay`, `alert`, `alert_over` (alarme
+déclenchée qui ne hurle plus, jusqu'au désarmement). Une automatisation
+HA peut s'en servir pour apprendre une intrusion vue pendant une panne.
+
+HA envoie `true`/`ON` → son de test à pleine puissance, si la sirène n'est
+pas armée. HA envoie `false`/`OFF` → désarme la sirène (openqiara la
+réarme si l'alarme l'est encore).
 
 ### Alarme (alarm_control_panel)
 
@@ -120,7 +129,8 @@ Quand `alarm.mode = "alarmo"` :
 - openqiarad subscribe `alarmo/state` (configurable via `alarm.alarmo_state_topic`)
 - openqiarad publie sur `alarmo/command` (configurable via `alarm.alarmo_command_topic`)
 - Pas d'entité `alarm_control_panel` propre côté openqiarad
-- Les transitions `alarmo/state` déclenchent les beeps/wail SRN via `handleSirenForAlarmState`
+- La sirène suit les transitions `alarmo/state`, armée en miroir (voir
+  [sensors.md](sensors.md), « La sirène tient l'alarme »)
 
 ### Entités supplémentaires
 

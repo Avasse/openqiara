@@ -74,6 +74,8 @@ func buildDiscoveryPayload(prefix string, sensor camera.Sensor) (discoveryPayloa
 	if sensor.Type == "SRN" {
 		p.CommandTopic = fmt.Sprintf("%s/siren/%d/set", prefix, sensor.ID)
 		p.ValueTemplate = "{{ value_json.active | lower }}"
+		// state: alert_over is an alarm set off that no longer wails.
+		p.JSONAttributesTemplate = `{"battery": {{ value_json.battery }}, "reachable": {{ value_json.reachable | lower }}, "state": "{{ value_json.state | default('') }}"}`
 		p.PayloadOn = "true"
 		p.PayloadOff = "false"
 	}
