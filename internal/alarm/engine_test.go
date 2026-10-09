@@ -180,10 +180,37 @@ func TestWhatIsIgnored(t *testing.T) {
 	e.HandleSensorEvent(17, "PIR", true)
 	expect(t, e, siren, StateArmedNight)
 
+	e.HandleSensorEvent(17, "PIR", false)
 	e.HandleCommand("arm_away", SourceRemote)
 	expect(t, e, siren, StateArmedAway, "arm")
 	e.HandleSensorEvent(17, "PIR", true)
 	expect(t, e, siren, StatePending, "entry delay")
+}
+
+// TestModeSwitchSeesSensorsInAlarm: from night to away, a sensor in alarm
+// that night left out now starts the entry delay.
+func TestModeSwitchSeesSensorsInAlarm(t *testing.T) {
+	e, siren := newTestEngine(t, map[int]SensorConfig{17: {NightAllowed: true}})
+	e.HandleCommand("arm_night", SourceRemote)
+	e.HandleSensorEvent(17, "PIR", true)
+	expect(t, e, siren, StateArmedNight, "arm night")
+	e.HandleCommand("arm_away", SourceRemote)
+	expect(t, e, siren, StatePending, "arm", "entry delay")
+}
+
+// TestLoadUnreadable: a state file that cannot be read starts disarmed,
+// and so is the siren.
+func TestLoadUnreadable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "alarm.json")
+	if err := os.WriteFile(path, []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	siren := &fakeSiren{}
+	e := New(path, siren, nil, nil, nil)
+	if err := e.Load(); err == nil {
+		t.Fatal("a broken file loaded")
+	}
+	expect(t, e, siren, StateDisarmed, "disarm")
 }
 
 // TestNoSiren: without a siren (or with siren_sounds none), the engine's

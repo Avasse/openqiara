@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"slices"
 	"testing"
 )
@@ -29,15 +27,16 @@ func (f *fakeSiren) Alert()      { f.calls = append(f.calls, "alert") }
 // Alarmo's exit delay arms it for away, then for the mode once armed.
 func TestMirrorFollowsAlarmo(t *testing.T) {
 	siren := &fakeSiren{}
-	sc := newSirenController(context.Background(), siren, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	sc := newSirenController(context.Background(), siren)
 	sc.synchronous = true
 
-	for _, step := range [][2]string{
-		{"disarmed", ""}, {"arming", "disarmed"}, {"armed_night", "arming"}, {"armed_night", "armed_night"},
-		{"pending", "armed_night"}, {"triggered", "pending"}, {"disarmed", "triggered"},
-		{"armed_away", "disarmed"}, {"armed_home", "armed_away"},
+	// The first state is the retained one, after a start: taken even if
+	// it is the one openqiarad assumed.
+	for _, state := range []string{
+		"disarmed", "arming", "armed_night", "armed_night", "pending", "triggered", "disarmed",
+		"armed_away", "armed_home",
 	} {
-		sc.Handle(step[0], step[1])
+		sc.Handle(state)
 	}
 	want := []string{"disarm", "arm delayed", "arm night", "entry delay", "alert", "disarm", "arm", "arm night"}
 	if !slices.Equal(siren.calls, want) {

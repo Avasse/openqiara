@@ -70,6 +70,15 @@ func TestDriverArming(t *testing.T) {
 	d.Arm(false, false)
 	sent(t, r)
 
+	// An immediate arming ends an exit delay of the same mode.
+	d.Disarm()
+	d.Arm(false, true)
+	sent(t, r, "disarm", "arm delayed")
+	d.Arm(false, true)
+	sent(t, r)
+	d.Arm(false, false)
+	sent(t, r, "disarm", "arm")
+
 	r2 := &fakeRadio{}
 	d2 := NewSirenDriver(r2, nil)
 	d2.HandleReport(SirenArmed) // armed before the start, masks not known

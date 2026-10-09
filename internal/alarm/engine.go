@@ -178,10 +178,12 @@ func (e *Engine) Load() error {
 		return nil
 	}
 	if err != nil {
+		e.siren.Disarm() // starting disarmed
 		return fmt.Errorf("alarm: read state: %w", err)
 	}
 	var p persistedState
 	if err := json.Unmarshal(data, &p); err != nil {
+		e.siren.Disarm() // starting disarmed
 		return fmt.Errorf("alarm: parse state: %w", err)
 	}
 	mode := p.Mode
@@ -277,6 +279,7 @@ func (e *Engine) HandleCommand(cmd string, source Source) {
 			e.mode = mode
 			e.transitionLocked(mode, "switch mode")
 			e.siren.Arm(mode == StateArmedNight, false)
+			e.inAlarmLocked() // night to away: a sensor now watched
 		default:
 			// Arming, pending or triggered: disarm first.
 		}
@@ -291,6 +294,11 @@ func (e *Engine) HandleCommand(cmd string, source Source) {
 func (e *Engine) armedLocked(reason string) {
 	e.armedAt = time.Now().Unix()
 	e.transitionLocked(e.mode, reason)
+	e.inAlarmLocked()
+}
+
+// inAlarmLocked sets the alarm off for a watched sensor still in alarm.
+func (e *Engine) inAlarmLocked() {
 	for id, inAlarm := range e.lastAlarm {
 		if inAlarm && e.watchedLocked(id) {
 			e.logger.Info("alarm: sensor still in alarm once armed", "sensor_id", id)
@@ -306,8 +314,11 @@ func (e *Engine) HandleSensorEvent(sensorID int, sensorType string, inAlarm bool
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if sensorType == "KPD" {
+		return // the keypad commands the alarm, it never sets it off
+	}
 	e.lastAlarm[sensorID] = inAlarm
-	if sensorType == "KPD" || !inAlarm || !e.watchedLocked(sensorID) {
+	if !inAlarm || !e.watchedLocked(sensorID) {
 		return
 	}
 	switch e.state {

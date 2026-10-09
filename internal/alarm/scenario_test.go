@@ -217,6 +217,21 @@ func TestScenarioAlarmoMirror(t *testing.T) {
 	holds(t, "the night sensor sets nothing off", r.sirenIs(SirenArmed))
 }
 
+// TestScenarioAlarmoExitShorter: Alarmo's exit delay ends before the
+// siren's; armed at once then, the siren takes an alert right away
+// instead of staying mute until its own exit delay ends (third grill).
+func TestScenarioAlarmoExitShorter(t *testing.T) {
+	sim := newSimSiren(simSensors)
+	sim.set(func(s *simSiren) { s.exit = time.Second })
+	r := newRig(t, sim, false, "")
+	r.driver.Disarm()
+	r.driver.Arm(false, true) // arming
+	eventually(t, "siren in its exit delay", r.sirenIs(SirenExitDelay))
+	r.driver.Arm(false, false) // armed_away, Alarmo's delay over
+	r.driver.Alert()           // triggered at once
+	eventually(t, "siren alert well before its own exit delay ends", r.sirenIs(SirenAlert))
+}
+
 // TestScenarioBootKeepsTheOutageAlarm: openqiarad starts while the siren
 // holds an alarm raised during the outage; Alarmo's retained state says
 // armed: the siren keeps it (grill R1). Disarmed, it stops.

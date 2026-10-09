@@ -83,7 +83,10 @@ func (d *SirenDriver) Arm(night, delayed bool) {
 		d.err("state", d.radio.RequestState())
 	case SirenEntryDelay, SirenAlert, SirenAlertOver:
 	case SirenArmed, SirenExitDelay:
-		if d.armed != nil && *d.armed == night && (!delayed || d.last == SirenExitDelay) {
+		// Kept if armed for the mode already; an immediate arming ends an
+		// exit delay (Alarmo's was shorter than the siren's: set off
+		// during the rest of it, it would stay mute).
+		if d.armed != nil && *d.armed == night && (d.last == SirenArmed || delayed) {
 			return
 		}
 		d.err("disarm", d.radio.Disarm())
