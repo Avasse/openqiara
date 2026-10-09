@@ -759,9 +759,11 @@ func (c *RadioClient) SendPKT(ctx context.Context, data []byte) error {
 //   - 55 05 <S> sets its state: 00 off (from any state), 01 the test
 //     sound <power> <quarter seconds> (from off), 04 the entry delay (from
 //     armed), 05 the alert (from armed, entry delay or after an alert).
-//   - 55 01 <ts:4> <0x40|index> <value> is a sensor's alarm report: armed,
-//     the siren starts the entry delay or the alert by itself, but tells
-//     nobody (that path is meant for when the gateway is gone): ask 55 06.
+//   - 55 01 <ts:4> <0x40|index> <value> is a sensor's alarm report, which
+//     the sensors send the siren when the gateway is gone: armed, it starts
+//     the entry delay or the alert by itself. Relayed by the gateway, it
+//     works but the siren then reports nothing, not even to 55 06: the
+//     gateway sends 55 05 04 or 05 instead, as fbxhome did.
 //   - 55 06 asks for its state, reported as 55 01 <ts:4> 00 <state>.
 var (
 	sirenOff      = []byte{0x55, 0x05, 0x00}
@@ -839,27 +841,6 @@ func (c *RadioClient) SirenEntryDelay(_ context.Context, id int) error {
 // SirenAlert sets an armed siren off.
 func (c *RadioClient) SirenAlert(_ context.Context, id int) error {
 	return c.sirenCommand(id, []byte{0x55, 0x05, 0x05})
-}
-
-// RelaySensorAlarm hands the siren a sensor's alarm report, as the sensor
-// itself does when the gateway is gone, then asks for the siren's state,
-// which this path does not report.
-func (c *RadioClient) RelaySensorAlarm(_ context.Context, id, sensorID int) error {
-	addr, err := c.sirenAddr(id)
-	if err != nil {
-		return err
-	}
-	c.mu.Lock()
-	n, ok := c.nodes[sensorID]
-	c.mu.Unlock()
-	if !ok {
-		return fmt.Errorf("radio: no paired sensor %d", sensorID)
-	}
-	if n.SystemIndex >= 64 {
-		return fmt.Errorf("radio: sensor %d has no index the siren takes", sensorID)
-	}
-	report := []byte{0x55, 0x01, 0, 0, 0, 0, 0x40 | n.SystemIndex, 0}
-	return errors.Join(c.command(addr, report), c.command(addr, sirenGetState))
 }
 
 // RequestSirenState asks the siren for its state, which comes back as an

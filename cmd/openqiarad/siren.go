@@ -49,10 +49,6 @@ func (s nativeSiren) Arm(night, delayed bool) error {
 	return s.cam.ArmSiren(s.ctx, s.id(), s.arming(night, delayed))
 }
 
-func (s nativeSiren) Relay(sensorID int) error {
-	return s.cam.RelaySensorAlarm(s.ctx, s.id(), sensorID)
-}
-
 // Disarm disarms the siren if there is one, siren_sounds none included.
 func (s nativeSiren) Disarm() error {
 	id := s.id()

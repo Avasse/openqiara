@@ -26,7 +26,8 @@ func (f *fakeSiren) Arm(night, delayed bool) error {
 	f.calls = append(f.calls, call)
 	return nil
 }
-func (f *fakeSiren) Relay(id int) error { f.calls = append(f.calls, "relay"); return nil }
+func (f *fakeSiren) EntryDelay() error { f.calls = append(f.calls, "entry delay"); return nil }
+func (f *fakeSiren) Alert() error      { f.calls = append(f.calls, "alert"); return nil }
 func (f *fakeSiren) Disarm() error      { f.calls = append(f.calls, "disarm"); return nil }
 func (f *fakeSiren) Wail() error        { f.calls = append(f.calls, "wail"); return nil }
 
@@ -69,7 +70,7 @@ func TestKeypadArmFollowsTheSiren(t *testing.T) {
 	expect(t, e, siren, StateArmedAway)
 
 	e.HandleSensorEvent(23, "DWS", true)
-	expect(t, e, siren, StateArmedAway, "relay")
+	expect(t, e, siren, StateArmedAway, "entry delay")
 	e.HandleSirenState(SirenEntryDelay)
 	expect(t, e, siren, StatePending)
 	e.HandleSirenState(SirenAlert)
@@ -86,13 +87,35 @@ func TestKeypadArmFollowsTheSiren(t *testing.T) {
 	expect(t, e, siren, StateDisarmed)
 }
 
+// TestSirenCommandPerSensor: a delayed sensor starts the entry delay, an
+// instant one the alert; once the alarm is under way, any sensor sets it
+// off again, except a delayed one during the entry delay.
+func TestSirenCommandPerSensor(t *testing.T) {
+	e, siren := newTestEngine(t, map[int]SensorConfig{30: {Instant: true}})
+	e.HandleCommand("arm_away", SourceRemote)
+	siren.take()
+	e.HandleSensorEvent(30, "DWS", true)
+	expect(t, e, siren, StateArmedAway, "alert")
+
+	e.HandleSirenState(SirenEntryDelay)
+	e.HandleSensorEvent(23, "DWS", true)
+	expect(t, e, siren, StatePending)
+	e.HandleSensorEvent(30, "DWS", false)
+	e.HandleSensorEvent(30, "DWS", true)
+	expect(t, e, siren, StatePending, "alert")
+
+	e.HandleSirenState(SirenAlertOver)
+	e.HandleSensorEvent(17, "PIR", true)
+	expect(t, e, siren, StateTriggered, "alert")
+}
+
 // TestRemoteArmIsImmediate: Home Assistant and HomeKit arm with no exit
 // delay, and a sensor already in alarm is relayed once armed.
 func TestRemoteArmIsImmediate(t *testing.T) {
 	e, siren := newTestEngine(t, nil)
 	e.HandleSensorEvent(23, "DWS", true)
 	e.HandleCommand("arm_night", SourceRemote)
-	expect(t, e, siren, StateArmedNight, "arm night", "relay")
+	expect(t, e, siren, StateArmedNight, "arm night", "entry delay")
 }
 
 // TestSensorInAlarmWhenTheExitDelayEnds: a door left open sets the alarm
@@ -103,7 +126,7 @@ func TestSensorInAlarmWhenTheExitDelayEnds(t *testing.T) {
 	e.HandleSensorEvent(23, "DWS", true)
 	expect(t, e, siren, StateArming, "arm delayed")
 	e.HandleSirenState(SirenArmed)
-	expect(t, e, siren, StateArmedAway, "relay")
+	expect(t, e, siren, StateArmedAway, "entry delay")
 }
 
 // TestWhatIsNotRelayed: the keypad, a sensor back to rest, anything while
@@ -124,7 +147,7 @@ func TestWhatIsNotRelayed(t *testing.T) {
 	e.HandleCommand("arm_away", SourceRemote)
 	expect(t, e, siren, StateArmedAway, "disarm", "arm")
 	e.HandleSensorEvent(17, "PIR", true)
-	expect(t, e, siren, StateArmedAway, "relay")
+	expect(t, e, siren, StateArmedAway, "entry delay")
 }
 
 // TestModeSwitchOffNotARestart: the "off" our own disarming brings on a
@@ -200,14 +223,14 @@ func TestMuteSiren(t *testing.T) {
 	e.HandleCommand("arm_away", SourceRemote)
 	e.HandleSensorEvent(23, "DWS", true)
 	time.Sleep(60 * time.Millisecond)
-	expect(t, e, siren, StateTriggered, "arm", "relay", "wail")
+	expect(t, e, siren, StateTriggered, "arm", "entry delay", "wail")
 
 	e.HandleCommand("disarm", SourceLocal)
 	e.HandleCommand("arm_away", SourceRemote)
 	e.HandleSensorEvent(23, "DWS", true)
 	e.HandleSirenState(SirenArmed) // not in its masks: it stays armed
 	time.Sleep(60 * time.Millisecond)
-	expect(t, e, siren, StateArmedAway, "disarm", "arm", "relay")
+	expect(t, e, siren, StateArmedAway, "disarm", "arm", "entry delay")
 }
 
 // TestLoad: the state comes back as it was, the mode with it; the siren's

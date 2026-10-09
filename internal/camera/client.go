@@ -55,10 +55,6 @@ type Client interface {
 	// SirenAlert sets an armed siren off.
 	SirenAlert(ctx context.Context, sensorID int) error
 
-	// RelaySensorAlarm hands an armed siren a sensor's alarm: the siren
-	// decides between the entry delay and the alert.
-	RelaySensorAlarm(ctx context.Context, sirenID, sensorID int) error
-
 	// RequestSirenState asks the siren for its state (Sensor.SirenState).
 	RequestSirenState(ctx context.Context, sensorID int) error
 

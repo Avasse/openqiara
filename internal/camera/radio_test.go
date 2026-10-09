@@ -242,7 +242,6 @@ func TestRadioSirenNative(t *testing.T) {
 	send(c.SirenEntryDelay(ctx, 29), []byte{0x55, 0x05, 0x04})
 	send(c.SirenAlert(ctx, 29), []byte{0x55, 0x05, 0x05})
 	send(c.StopSiren(ctx, 29), []byte{0x55, 0x05, 0x00})
-	send(c.RelaySensorAlarm(ctx, 29, 23), []byte{0x55, 0x01, 0, 0, 0, 0, 0x42, 0}, []byte{0x55, 0x06})
 	if err := c.ArmSiren(ctx, 23, SirenArming{}); err == nil {
 		t.Error("a door was armed as a siren")
 	}

@@ -45,7 +45,6 @@ func (c *stubCamera) StopSiren(context.Context, int) error                    { 
 func (c *stubCamera) ArmSiren(context.Context, int, camera.SirenArming) error { return nil }
 func (c *stubCamera) SirenEntryDelay(context.Context, int) error              { return nil }
 func (c *stubCamera) SirenAlert(context.Context, int) error                   { return nil }
-func (c *stubCamera) RelaySensorAlarm(context.Context, int, int) error        { return nil }
 func (c *stubCamera) RequestSirenState(context.Context, int) error            { return nil }
 func (c *stubCamera) SetShutter(context.Context, bool) error                  { return nil }
 func (c *stubCamera) Events() <-chan camera.SensorEvent                       { return nil }

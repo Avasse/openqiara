@@ -90,7 +90,9 @@ durée de l'alarme.
 
 - **Mode `standalone`** : la sirène est la centrale. openqiarad l'arme
   (au clavier avec le délai de sortie, depuis HA ou HomeKit sans), lui
-  relaie chaque détection et publie l'état qu'elle rapporte.
+  signale chaque détection (délai d'entrée, ou alerte pour un capteur
+  `instant`) et publie l'état qu'elle rapporte. Si elle ne répond pas
+  dans les 10 s, openqiarad déclenche l'alarme sans elle.
 - **Mode `alarmo`** : Alarmo décide, la sirène suit son état, armée en
   miroir. Réglez les délais d'openqiara comme ceux d'Alarmo.
 - **Si la caméra tombe** (panne, Wi-Fi, openqiarad arrêté), les capteurs

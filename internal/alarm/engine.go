@@ -3,9 +3,9 @@
 // The siren keeps the alarm, as it did under fbxhome: armed, it counts the
 // exit and entry delays, plays their beeps and wails, and it hears the
 // sensors itself when the gateway is gone. The engine arms and disarms it,
-// relays it the sensors' alarms, and takes its state from what the siren
-// reports. A relayed alarm the siren does not answer within relayTimeout
-// sets the alarm off here. Without a siren (or with siren_sounds none),
+// tells it when a sensor is in alarm (entry delay or alert, as fbxhome
+// did), and takes its state from what the siren reports. A command the
+// siren does not answer within relayTimeout sets the alarm off here. Without a siren (or with siren_sounds none),
 // the engine counts the delays itself.
 //
 // The engine also keeps what the siren does not know: the mode (away or
@@ -95,9 +95,10 @@ type Siren interface {
 	Present() bool
 	// Arm arms it for the mode, after the exit delay or at once.
 	Arm(night, delayed bool) error
-	// Relay hands it a sensor's alarm: it starts the entry delay or the
-	// alert by itself.
-	Relay(sensorID int) error
+	// EntryDelay starts its entry delay, which it counts before the alert.
+	EntryDelay() error
+	// Alert sets it off.
+	Alert() error
 	// Disarm disarms it and stops its sound, whether it keeps the alarm or
 	// not (siren_sounds none): it must never stay armed.
 	Disarm() error
@@ -343,20 +344,34 @@ func (e *Engine) watchedLocked(sensorID int) bool {
 	return !(e.mode == StateArmedNight && e.configFor(sensorID).NightAllowed)
 }
 
-// sensorAlarmLocked hands a sensor's alarm to the siren, which decides and
-// reports; a siren that stays mute leaves the alarm to go off here.
-// Without a siren, the engine runs the entry delay itself.
+// sensorAlarmLocked tells the siren a sensor is in alarm: the entry delay
+// for a delayed sensor while armed, the alert for an instant one or once
+// the alarm is under way. The siren reports its state; one that stays
+// mute leaves the alarm to go off here. Without a siren, the engine runs
+// the entry delay itself.
+//
+// A sensor's report relayed as is would let the siren decide, but it then
+// reports nothing, not even to 55 06 (hardware, 2026-10-09): commands it
+// always answers.
 func (e *Engine) sensorAlarmLocked(sensorID int) {
 	e.logger.Info("alarm: sensor in alarm", "sensor_id", sensorID, "state", e.state)
 	armed := e.state == StateArmedAway || e.state == StateArmedNight
+	instant := e.configFor(sensorID).Instant
 	if armed {
 		e.trigBy = sensorID
 	}
 	if !e.hasSiren() {
-		e.localAlarmLocked(armed, e.configFor(sensorID).Instant)
+		e.localAlarmLocked(armed, instant)
 		return
 	}
-	e.sirenErr("relay", e.siren.Relay(sensorID))
+	switch {
+	case armed && !instant:
+		e.sirenErr("entry delay", e.siren.EntryDelay())
+	case e.state == StatePending && !instant:
+		return // the siren counts it already
+	default:
+		e.sirenErr("alert", e.siren.Alert())
+	}
 	if armed {
 		relayed := time.Now()
 		e.afterLocked(relayTimeout, func() {
