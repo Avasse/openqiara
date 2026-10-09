@@ -213,28 +213,27 @@ a { color: var(--primary); }
       <div class="form-group">
         <label>Sons sirène</label>
         <select id="cfg-siren-sounds">
-          <option value="all">Tous (bips pendant les délais + alarme)</option>
-          <option value="alarm_only">Alarme uniquement</option>
-          <option value="none">Désactivé</option>
+          <option value="all">Tous (bips de la sirène pendant les délais + alarme)</option>
+          <option value="alarm_only">Délais silencieux + alarme</option>
+          <option value="none">Sirène jamais armée</option>
         </select>
       </div>
-      <div id="cfg-charmux-timings">
-        <div class="form-group">
-          <label>Délai d'armement (s) <span style="color:var(--text-muted);font-size:12px">temps avant que la surveillance démarre après ARM</span></label>
-          <input type="number" id="cfg-arming-delay" min="0" max="600" step="1">
-        </div>
-        <div class="form-group">
-          <label>Délai de pré-alarme (s) <span style="color:var(--text-muted);font-size:12px">temps après détection avant que la sirène se déclenche</span></label>
-          <input type="number" id="cfg-pending-delay" min="0" max="600" step="1">
-        </div>
-      </div>
-      <!-- Wail duration : utilisé par notre TriggerSirenAlarm dans tous
-           les modes (standalone ET alarmo, peu importe le backend). On
-           le sort des deux blocs timings spécifiques au mode. -->
+      <!-- Délais comptés par la sirène, dans les deux modes : en alarmo,
+           ils ne servent que si la passerelle tombe, à régler comme ceux
+           d'Alarmo. -->
       <div class="form-group">
-        <label>Durée du wail (s) <span style="color:var(--text-muted);font-size:12px">durée du burst d'alarme avant arrêt</span></label>
-        <input type="number" id="cfg-wail-duration" min="1" max="60" step="1">
+        <label>Délai de sortie (s) <span style="color:var(--text-muted);font-size:12px">après un armement au clavier, 255 s au plus</span></label>
+        <input type="number" id="cfg-arming-delay" min="0" max="255" step="1">
       </div>
+      <div class="form-group">
+        <label>Délai d'entrée (s) <span style="color:var(--text-muted);font-size:12px">entre la détection et l'alarme, 255 s au plus</span></label>
+        <input type="number" id="cfg-pending-delay" min="0" max="255" step="1">
+      </div>
+      <div class="form-group">
+        <label>Durée de l'alarme (s) <span style="color:var(--text-muted);font-size:12px">510 s au plus</span></label>
+        <input type="number" id="cfg-wail-duration" min="1" max="510" step="1">
+      </div>
+      <p style="color:var(--text-muted);font-size:12px">En mode Alarmo, ces délais ne servent que si la caméra tombe en panne : la sirène armée prend alors le relais. Réglez-les comme ceux d'Alarmo.</p>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
 
       <!-- Avancé (plié par défaut) -->
@@ -792,12 +791,8 @@ async function loadConfig() {
       document.getElementById('cfg-wail-duration').value = d.alarm.wail_duration_seconds ?? 3;
       window.currentAlarmMode = mode;
     }
-    // Délais de l'engine local : seulement en standalone. En alarmo, HA
-    // Alarmo pilote l'alarme et ces délais n'ont aucun effet.
     const alarmMode = (d.alarm && d.alarm.mode) || 'standalone';
     window.currentAlarmMode = alarmMode;
-    const charmuxTimings = document.getElementById('cfg-charmux-timings');
-    if (charmuxTimings) charmuxTimings.style.display = alarmMode === 'standalone' ? '' : 'none';
     // Web
     if (d.web) {
       document.getElementById('cfg-web-enabled').value = d.web.enabled ? 'true' : 'false';
@@ -1153,13 +1148,12 @@ function renderSensors(sensors) {
   // changement de mode alarme (les flags par capteur disparaissent
   // en mode alarmo).
   window.lastSensors = sensors;
-  // En mode alarmo, HA Alarmo décide quels capteurs déclenchent quoi :
-  // night_allowed n'y a aucun effet, on le masque. En standalone, il dit
-  // si le capteur est ignoré quand l'alarme est armée pour la nuit.
-  const standalone = (window.currentAlarmMode || 'standalone') === 'standalone';
+  // night_allowed et instant disent à la sirène quels capteurs elle
+  // surveille, et avec quel délai : dans les deux modes, puisqu'en alarmo
+  // la sirène armée prend le relais si la caméra tombe.
   list.innerHTML = sensors.map(s => {
     const isSensor = s.type !== 'KPD' && s.type !== 'SRN';
-    const showNightAllowed = standalone && isSensor;
+    const showNightAllowed = isSensor;
     const nightChecked = s.night_allowed ? 'checked' : '';
     const safeLabel = escapeHTML(s.label || (s.type + ' #' + s.id));
     const safeLabelJS = escapeJSString(s.label || '');

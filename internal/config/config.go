@@ -60,22 +60,23 @@ type AlarmConfig struct {
 	// (default "alarmo/state"). Used only in mode "alarmo".
 	AlarmoStateTopic string `json:"alarmo_state_topic,omitempty"`
 
-	// SirenSounds controls which sounds the physical siren plays.
-	// "all"  (default) = beeps during the arming and entry delays + wail
-	// "alarm_only"     = only the wail
-	// "none"           = completely silent (siren disabled)
+	// SirenSounds controls the siren, which keeps the alarm's delays.
+	// "all"  (default) = its beeps in the exit and entry delays, then the alert
+	// "alarm_only"     = quiet delays (not tried on the hardware yet), then the alert
+	// "none"           = never armed nor set off
 	SirenSounds string `json:"siren_sounds"`
 
-	// ArmingDelaySeconds is the grace period after ARM_AWAY before surveillance
-	// actually starts (default 60s). 0 means "use default".
+	// ArmingDelaySeconds is the exit delay after arming from the keypad,
+	// counted by the siren: 255 s at most (default 60s). 0 means "use
+	// default".
 	ArmingDelaySeconds int `json:"arming_delay_seconds,omitempty"`
 
-	// PendingDelaySeconds is the grace period after a sensor triggers in armed
-	// mode before the siren fires (default 60s). 0 means "use default".
+	// PendingDelaySeconds is the entry delay before the alert, counted by
+	// the siren: 255 s at most (default 60s). 0 means "use default".
 	PendingDelaySeconds int `json:"pending_delay_seconds,omitempty"`
 
-	// WailDurationSeconds is how long the siren wails before being stopped
-	// during an alarm burst (default 3s). 0 means "use default".
+	// WailDurationSeconds is how long the alert lasts, counted by the siren
+	// in 2 s steps, 510 s at most (default 3s). 0 means "use default".
 	WailDurationSeconds int `json:"wail_duration_seconds,omitempty"`
 }
 

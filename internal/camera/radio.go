@@ -2,6 +2,7 @@ package camera
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -375,6 +376,11 @@ func (c *RadioClient) trace(dir string, peer uint32, f charmux.ManagedFrame) {
 		"wflags", fmt.Sprintf("%02x", f.WFlags), "payload", payload)
 }
 
+// sirenStates names the states the siren reports (its bytecode, 7 states).
+var sirenStates = map[int]string{
+	0: "off", 1: "test", 2: "exit_delay", 3: "armed", 4: "entry_delay", 5: "alert", 6: "alert_over",
+}
+
 var keypadActions = map[radio.EventKind]string{
 	radio.ArmedAway: "armed_away", radio.ArmedNight: "armed_night", radio.Disarmed: "disarmed",
 }
@@ -420,6 +426,7 @@ func (c *RadioClient) publish(ev radio.Event) {
 		c.log.Warn("radio: keypad emergency button, not handled", "id", id)
 	case radio.SirenState:
 		c.log.Info("radio: siren state", "id", id, "state", ev.Value)
+		s.SirenState, report = sirenStates[ev.Value], true
 	case radio.Rebooted:
 		c.log.Info("radio: sensor rebooted, provisioning it", "id", id)
 	case radio.Unhandled:
@@ -707,61 +714,152 @@ func (c *RadioClient) SendPKT(ctx context.Context, data []byte) error {
 	return c.mcu.SendPKT(ctx, data)
 }
 
-// Siren payloads, after the application class byte. 55 05 01 <power>
-// <duration> plays a sound the siren stops by itself, the duration in
-// quarter seconds (63 s at most), as fbxhome sent it (HlSrn::on_write
-// 0xab734); 55 05 00 84 stops it. The
-// wake frame was found by ear in April 2026: fbxhome does not send it.
+// Siren payloads, after the application class byte (HlSrn, RE 2026-10-08,
+// checked on the siren's bytecode and on the hardware 2026-10-09):
+//
+//   - 55 04 <exit> <entry> <alert/2> <05> <64> <S> <active:u64> <delayed:u64>
+//     arms it, from off only: S 02 after the exit delay, 03 at once. The
+//     masks hold one bit per system index. The siren keeps the delays and
+//     plays their beeps, and it hears the sensors itself when the gateway
+//     is gone.
+//   - 55 05 <S> sets its state: 00 off (from any state), 01 the test
+//     sound <power> <quarter seconds> (from off), 04 the entry delay (from
+//     armed), 05 the alert (from armed, entry delay or after an alert).
+//   - 55 01 <ts:4> <0x40|index> <value> is a sensor's alarm report: armed,
+//     the siren starts the entry delay or the alert by itself, but tells
+//     nobody (that path is meant for when the gateway is gone): ask 55 06.
+//   - 55 06 asks for its state, reported as 55 01 <ts:4> 00 <state>.
 var (
+	sirenOff      = []byte{0x55, 0x05, 0x00}
+	sirenGetState = []byte{0x55, 0x06}
+	// sirenWake is 55 0b, the siren's Sigfox credentials, here empty: found
+	// by ear in April 2026 and long sent before every sound, it is needed
+	// by none (hardware, 2026-10-09). Kept for the debug API only.
 	sirenWake = []byte{0x55, 0x0b, 0, 0, 0, 0, 0, 0}
-	sirenStop = []byte{0x55, 0x05, 0x00, 0x84}
 )
 
 func sirenSound(power byte, d time.Duration) []byte {
 	return []byte{0x55, 0x05, 0x01, power, byte(min(d/(time.Second/4), 0xff))}
 }
 
+// SirenArming is what the siren needs to keep the alarm by itself.
+type SirenArming struct {
+	ExitDelay  time.Duration // 0: armed at once, no exit beeps
+	EntryDelay time.Duration
+	Alert      time.Duration // how long it wails
+	Active     []int         // sensors that set it off
+	Delayed    []int         // among them, those that start the entry delay
+	// Quiet zeroes the byte fbxhome always sends as 05, which the siren's
+	// bytecode hands to the sound of its delays: no beeps, if that byte is
+	// their volume (not tried on the hardware yet).
+	Quiet bool
+}
+
+// sirenSeconds is a delay as the siren takes it: whole seconds, at most 255.
+func sirenSeconds(d time.Duration, unit time.Duration) byte {
+	return byte(min((d+unit-1)/unit, 0xff))
+}
+
+// ArmSiren arms the siren, which must be off: it ignores the frame
+// otherwise.
+func (c *RadioClient) ArmSiren(_ context.Context, id int, a SirenArming) error {
+	addr, err := c.sirenAddr(id)
+	if err != nil {
+		return err
+	}
+	target, beeps := byte(0x02), byte(0x05)
+	if a.ExitDelay <= 0 {
+		target = 0x03
+	}
+	if a.Quiet {
+		beeps = 0
+	}
+	c.mu.Lock()
+	active, delayed := c.mask(a.Active), c.mask(a.Delayed)
+	c.mu.Unlock()
+	f := []byte{0x55, 0x04, sirenSeconds(a.ExitDelay, time.Second), sirenSeconds(a.EntryDelay, time.Second),
+		sirenSeconds(a.Alert, 2*time.Second), beeps, 0x64, target}
+	f = binary.BigEndian.AppendUint64(f, active)
+	f = binary.BigEndian.AppendUint64(f, delayed)
+	return c.command(addr, f)
+}
+
+// mask sets one bit per system index of the sensors served. Called with
+// mu held.
+func (c *RadioClient) mask(ids []int) uint64 {
+	var m uint64
+	for _, id := range ids {
+		if n, ok := c.nodes[id]; ok && n.SystemIndex < 64 {
+			m |= 1 << n.SystemIndex
+		}
+	}
+	return m
+}
+
+// SirenEntryDelay starts the entry delay of an armed siren.
+func (c *RadioClient) SirenEntryDelay(_ context.Context, id int) error {
+	return c.sirenCommand(id, []byte{0x55, 0x05, 0x04})
+}
+
+// SirenAlert sets an armed siren off.
+func (c *RadioClient) SirenAlert(_ context.Context, id int) error {
+	return c.sirenCommand(id, []byte{0x55, 0x05, 0x05})
+}
+
+// RelaySensorAlarm hands the siren a sensor's alarm report, as the sensor
+// itself does when the gateway is gone, then asks for the siren's state,
+// which this path does not report.
+func (c *RadioClient) RelaySensorAlarm(_ context.Context, id, sensorID int) error {
+	addr, err := c.sirenAddr(id)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	n, ok := c.nodes[sensorID]
+	c.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("radio: no paired sensor %d", sensorID)
+	}
+	report := []byte{0x55, 0x01, 0, 0, 0, 0, 0x40 | n.SystemIndex&0x3f, 0}
+	return errors.Join(c.command(addr, report), c.command(addr, sirenGetState))
+}
+
+// RequestSirenState asks the siren for its state, which comes back as an
+// event.
+func (c *RadioClient) RequestSirenState(_ context.Context, id int) error {
+	return c.sirenCommand(id, sirenGetState)
+}
+
 // TriggerSiren plays the discreet test sound fbxhome plays: power 10 for
-// 10 s.
-func (c *RadioClient) TriggerSiren(ctx context.Context, id int) error {
-	return c.play(ctx, id, sirenSound(10, 10*time.Second))
+// 10 s. Only an unarmed siren plays it.
+func (c *RadioClient) TriggerSiren(_ context.Context, id int) error {
+	return c.sirenCommand(id, sirenSound(10, 10*time.Second))
 }
 
-// BeepSiren plays the test sound for a quarter second, the shortest the
-// duration byte allows: the beep of the alarm's delays.
-func (c *RadioClient) BeepSiren(ctx context.Context, id int) error {
-	return c.play(ctx, id, sirenSound(10, time.Second/4))
-}
-
-// TriggerSirenAlarm starts the full-power wail, for duration (10 s if
-// unset). It returns at once: the siren stops by
-// itself.
-func (c *RadioClient) TriggerSirenAlarm(ctx context.Context, id int, duration time.Duration) error {
+// TriggerSirenAlarm plays the test sound at full power, for duration (10 s
+// if unset): the wail of an unarmed siren. It stops by itself.
+func (c *RadioClient) TriggerSirenAlarm(_ context.Context, id int, duration time.Duration) error {
 	if duration <= 0 {
 		duration = 10 * time.Second
 	}
-	return c.play(ctx, id, sirenSound(100, duration))
+	return c.sirenCommand(id, sirenSound(100, duration))
 }
 
-// StopSiren stops whatever the siren plays.
+// StopSiren disarms the siren and stops whatever it plays.
 func (c *RadioClient) StopSiren(_ context.Context, id int) error {
-	addr, err := c.sirenAddr(id)
-	if err != nil {
-		return err
-	}
-	return c.command(addr, sirenStop)
+	return c.sirenCommand(id, sirenOff)
 }
 
-func (c *RadioClient) play(ctx context.Context, id int, sound []byte) error {
+func (c *RadioClient) sirenCommand(id int, payload []byte) error {
 	addr, err := c.sirenAddr(id)
 	if err != nil {
 		return err
 	}
-	return c.sequence(ctx, addr, sound, true, false, 0)
+	return c.command(addr, payload)
 }
 
 // SendSirenDebug sends any payload to a paired radio address, for the
-// debug API: [wake] → payload → [hold, stop].
+// debug API: [55 0b] → payload → [hold, 55 05 00].
 func (c *RadioClient) SendSirenDebug(ctx context.Context, addr uint32, payload []byte, wake, stop bool, hold time.Duration) error {
 	c.mu.Lock()
 	_, ok := c.ids[addr]
@@ -782,8 +880,8 @@ func (c *RadioClient) sirenAddr(id int) (uint32, error) {
 	return n.Addr, nil
 }
 
-// sequence sends the wake frame, the command, and after hold the stop
-// frame, sent even when ctx ends first.
+// sequence sends 55 0b, the command, and after hold 55 05 00, sent even
+// when ctx ends first.
 func (c *RadioClient) sequence(ctx context.Context, addr uint32, cmd []byte, wake, stop bool, hold time.Duration) error {
 	if wake {
 		if err := c.command(addr, sirenWake); err != nil {
@@ -796,7 +894,7 @@ func (c *RadioClient) sequence(ctx context.Context, addr uint32, cmd []byte, wak
 	if err := c.command(addr, cmd); err != nil || !stop {
 		return err
 	}
-	return errors.Join(sleepCtx(ctx, hold), c.command(addr, sirenStop))
+	return errors.Join(sleepCtx(ctx, hold), c.command(addr, sirenOff))
 }
 
 // command sends an application payload to a siren, which listens all the

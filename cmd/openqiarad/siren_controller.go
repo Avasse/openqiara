@@ -5,169 +5,130 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/caligone/openqiara/internal/camera"
-	"github.com/caligone/openqiara/internal/config"
 )
 
-// sirenAPI est le sous-ensemble de camera.Client dont sirenController a besoin.
-// Découpé pour faciliter le mock en tests sans recréer toute l'interface Client.
-type sirenAPI interface {
-	CachedSensors() []camera.Sensor
-	BeepSiren(ctx context.Context, sensorID int) error
-	TriggerSirenAlarm(ctx context.Context, sensorID int, duration time.Duration) error
-	StopSiren(ctx context.Context, sensorID int) error
+// alarmoSiren is what the mirror of Alarmo asks of the siren (nativeSiren).
+type alarmoSiren interface {
+	Present() bool
+	State() string
+	Arm(night, delayed bool) error
+	EntryDelay() error
+	Alert() error
+	Wail() error
+	Disarm() error
 }
 
-// Cadence des bips pendant les délais de la centrale, plus pressante au
-// délai d'entrée : c'est le signal « désarme, sinon ça sonne ».
-var beepEvery = map[string]time.Duration{
-	"arming":  5 * time.Second,
-	"pending": 2 * time.Second,
-}
-
-// maxBeeping borne une série de bips si l'état ne bouge plus (un délai
-// Alarmo plus long que prévu, une transition perdue).
-const maxBeeping = 10 * time.Minute
-
-// sirenController pilote la sirène physique en fonction des transitions
-// d'état de la centrale d'alarme : bips pendant les délais d'armement et
-// d'entrée, wail au déclenchement, arrêt au désarmement.
+// sirenController mirrors Alarmo's state on the siren, in alarmo mode:
+// Alarmo decides and counts, the siren follows, armed natively so that it
+// keeps the alarm by itself if the gateway goes. Its exit and entry delays
+// are openqiara's (config): set them to Alarmo's, they only matter when
+// the gateway is gone.
 //
-// openqiara porte les délais, la sirène ne sert que de haut-parleur : les
-// bips sont son discret très court (BeepSiren), pas les trames d'armement
-// de fbxhome (55 04, 55 05 04 80) qui font tenir à la sirène son propre
-// compte à rebours, à désynchroniser du nôtre.
-//
-// Threading model :
-//   - Handle() est appelé depuis le callback alarm engine (mode standalone)
-//     ou depuis le handler MQTT (mode alarmo), potentiellement sous le lock
-//     de l'engine : il ne bloque pas. Les commandes passent par une file
-//     unique, exécutée dans l'ordre des transitions (un stop ne doit pas
-//     doubler un wail). En tests, synchronous=true les exécute inline.
-//   - Une série de bips tourne dans sa propre goroutine ; chaque
-//     transition l'arrête et attend qu'elle ait fini avant d'agir, pour
-//     qu'aucun bip n'arrive après le wail.
+// Handle (Alarmo's state topic) and SirenState (the siren's reports) come
+// from different goroutines: their commands go through one queue, in
+// order (a disarm must not overtake an arming). In tests, synchronous runs
+// them inline.
 type sirenController struct {
-	cam    sirenAPI
-	store  *config.Store
+	siren  alarmoSiren
 	logger *slog.Logger
 	ctx    context.Context
 
-	mu          sync.Mutex
-	sirenReady  bool
-	stopBeeps   func() // arrête la série de bips en cours et l'attend ; nil sinon
-	synchronous bool   // tests uniquement
-	every       map[string]time.Duration
+	mu        sync.Mutex
+	alarmo    string // Alarmo's last state
+	lastRearm time.Time
 
-	queue     chan func()
-	startOnce sync.Once
+	synchronous bool // tests only
+	queue       chan func()
+	startOnce   sync.Once
 }
 
-// newSirenController construit un controller pour le runtime.
-func newSirenController(ctx context.Context, cam sirenAPI, store *config.Store, logger *slog.Logger) *sirenController {
-	return &sirenController{
-		cam:    cam,
-		store:  store,
-		logger: logger,
-		ctx:    ctx,
-		every:  beepEvery,
-		queue:  make(chan func(), 16),
+func newSirenController(ctx context.Context, siren alarmoSiren, logger *slog.Logger) *sirenController {
+	return &sirenController{siren: siren, logger: logger, ctx: ctx, queue: make(chan func(), 16)}
+}
+
+// nightStates are Alarmo's armed states where night-allowed sensors are
+// left out; the others watch every sensor.
+var nightStates = map[string]bool{"armed_night": true, "armed_home": true, "armed_custom_bypass": true}
+
+func armedState(state string) bool {
+	switch state {
+	case "armed_away", "armed_vacation", "armed_night", "armed_home", "armed_custom_bypass":
+		return true
 	}
+	return false
 }
 
-// Handle pilote la sirène pour une transition d'état alarme. Idempotent
-// pour les transitions sans changement (newState == prevState).
+// Handle follows a change of Alarmo's state.
 func (s *sirenController) Handle(newState, prevState string) {
 	if newState == prevState {
 		return
 	}
-
 	s.mu.Lock()
-	// L'alarm engine émet "disarmed" au boot — rien à faire pour ça.
-	if !s.sirenReady {
-		s.sirenReady = true
-		if newState == "disarmed" {
-			s.mu.Unlock()
-			return
-		}
-	}
+	s.alarmo = newState
 	s.mu.Unlock()
 
-	mode := s.store.Get().SirenSoundsMode()
-
 	s.run(func() {
-		s.silence()
-		addr := s.findSRN()
-		if addr == 0 {
+		if !s.siren.Present() {
+			_ = s.siren.Disarm() // siren_sounds none: keep it quiet
 			return
 		}
-		// "none" doit quand même couper un wail en cours (sinon
-		// l'utilisateur n'a aucun moyen de l'arrêter après avoir basculé à
-		// none).
-		if mode == "none" {
-			_ = s.cam.StopSiren(s.ctx, addr)
-			return
+		var err error
+		switch {
+		case newState == "disarmed":
+			err = s.siren.Disarm()
+		case newState == "arming":
+			err = s.siren.Arm(false, true)
+		case armedState(newState):
+			// An armed siren takes no new arming: off first (silent).
+			if err = s.siren.Disarm(); err == nil {
+				err = s.siren.Arm(nightStates[newState], false)
+			}
+		case newState == "pending":
+			err = s.siren.EntryDelay()
+		case newState == "triggered":
+			switch s.siren.State() {
+			case "armed", "entry_delay", "alert", "alert_over":
+				err = s.siren.Alert()
+			default: // not armed natively: the test sound at full power
+				err = s.siren.Wail()
+			}
 		}
-		switch newState {
-		case "arming", "pending":
-			if mode == "all" {
-				s.beep(addr, s.every[newState])
-			}
-		case "triggered":
-			wail := s.store.Get().WailDuration()
-			s.logger.Warn("siren: ALARM TRIGGERED — firing wail", "addr", addr, "duration", wail)
-			if err := s.cam.TriggerSirenAlarm(s.ctx, addr, wail); err != nil {
-				s.logger.Error("siren: wail failed", "error", err)
-			}
-		case "disarmed":
-			s.logger.Info("siren: disarm — sending stop", "addr", addr)
-			if err := s.cam.StopSiren(s.ctx, addr); err != nil {
-				s.logger.Error("siren: stop failed", "error", err)
-			}
+		if err != nil {
+			s.logger.Error("siren: following alarmo failed", "state", newState, "error", err)
 		}
 	})
 }
 
-// beep fait biper la sirène toutes les every, jusqu'à la transition
-// suivante ou maxBeeping.
-func (s *sirenController) beep(addr int, every time.Duration) {
-	ctx, cancel := context.WithTimeout(s.ctx, maxBeeping)
-	done := make(chan struct{})
+// SirenState reconciles the siren with Alarmo: armed while Alarmo is
+// disarmed, it is disarmed; off while Alarmo is armed (it rebooted), it is
+// armed again, at once and not more than every rearmEvery.
+func (s *sirenController) SirenState(state string) {
 	s.mu.Lock()
-	s.stopBeeps = func() { cancel(); <-done }
+	alarmo := s.alarmo
+	rearm := alarmo != "disarmed" && alarmo != "" && state == "off" && time.Since(s.lastRearm) > rearmEvery
+	if rearm {
+		s.lastRearm = time.Now()
+	}
 	s.mu.Unlock()
-	go func() {
-		defer close(done)
-		tick := time.NewTicker(every)
-		defer tick.Stop()
-		for {
-			if err := s.cam.BeepSiren(ctx, addr); err != nil && ctx.Err() == nil {
-				s.logger.Warn("siren: beep failed", "error", err)
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case <-tick.C:
-			}
-		}
-	}()
-}
 
-// silence arrête la série de bips en cours, s'il y en a une, et attend
-// qu'elle ait fini.
-func (s *sirenController) silence() {
-	s.mu.Lock()
-	stop := s.stopBeeps
-	s.stopBeeps = nil
-	s.mu.Unlock()
-	if stop != nil {
-		stop()
+	switch {
+	case (alarmo == "disarmed") && state != "off" && state != "test" && state != "":
+		s.run(func() {
+			s.logger.Warn("siren: armed while alarmo is disarmed, disarming it", "siren", state)
+			_ = s.siren.Disarm()
+		})
+	case rearm && s.siren.Present():
+		s.run(func() {
+			s.logger.Warn("siren: off while alarmo is armed, arming it again", "alarmo", alarmo)
+			_ = s.siren.Arm(nightStates[alarmo], false)
+		})
 	}
 }
 
-// run exécute fn dans la file des commandes sirène (runtime normal) ou
-// inline (tests).
+// rearmEvery spaces out the re-arming of a siren that keeps refusing.
+const rearmEvery = 30 * time.Second
+
+// run runs fn in the siren's command queue, or inline in tests.
 func (s *sirenController) run(fn func()) {
 	if s.synchronous {
 		fn()
@@ -189,13 +150,4 @@ func (s *sirenController) run(fn func()) {
 	case s.queue <- fn:
 	case <-s.ctx.Done():
 	}
-}
-
-func (s *sirenController) findSRN() int {
-	for _, snap := range s.cam.CachedSensors() {
-		if snap.Type == "SRN" {
-			return snap.ID
-		}
-	}
-	return 0
 }

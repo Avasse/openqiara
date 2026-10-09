@@ -191,9 +191,9 @@ func TestRadioEvents(t *testing.T) {
 	}
 }
 
-// TestRadioSiren: the wail carries its duration, in quarter seconds, like
-// fbxhome's: the siren stops by itself, no stop frame follows and the
-// call does not last the wail.
+// TestRadioSiren: the test sound carries its duration, in quarter
+// seconds, like fbxhome's: the siren stops by itself, no stop frame
+// follows and the call does not last the sound. No 55 0b before it.
 func TestRadioSiren(t *testing.T) {
 	c, mcu, _ := newRadio(t, dws, srn)
 	mcu.sent(t) // get-state
@@ -205,24 +205,53 @@ func TestRadioSiren(t *testing.T) {
 		if err := c.TriggerSirenAlarm(context.Background(), 29, tc.d); err != nil {
 			t.Fatal(err)
 		}
-		for _, want := range [][]byte{sirenWake, {0x55, 0x05, 0x01, 0x64, tc.want}} {
-			if f := mcu.sent(t); f.Route != 6 || f.WFlags != 0x01 || !bytes.Equal(f.Payload, want) {
-				t.Errorf("frame = %+v, want %x to the siren", f, want)
-			}
+		want := []byte{0x55, 0x05, 0x01, 0x64, tc.want}
+		if f := mcu.sent(t); f.Route != 6 || f.WFlags != 0x01 || !bytes.Equal(f.Payload, want) {
+			t.Errorf("frame = %+v, want %x to the siren", f, want)
 		}
 		mcu.quiet(t)
 	}
 	if err := c.TriggerSirenAlarm(context.Background(), 23, 0); err == nil {
 		t.Error("a door was made to wail")
 	}
-	// A beep: the discreet test sound for a quarter second.
-	if err := c.BeepSiren(context.Background(), 29); err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range [][]byte{sirenWake, {0x55, 0x05, 0x01, 0x0a, 0x01}} {
-		if f := mcu.sent(t); !bytes.Equal(f.Payload, want) {
-			t.Errorf("beep frame = %x, want %x", f.Payload, want)
+}
+
+// TestRadioSirenNative: arming carries the delays and one bit per system
+// index of the sensors; the siren's commands and a relayed alarm are the
+// frames the siren took on the hardware (2026-10-09).
+func TestRadioSirenNative(t *testing.T) {
+	c, mcu, _ := newRadio(t, kpd, dws, srn)
+	mcu.sent(t) // get-state
+	ctx := context.Background()
+	send := func(err error, want ...[]byte) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
 		}
+		for _, w := range want {
+			if f := mcu.sent(t); f.Route != 6 || !bytes.Equal(f.Payload, w) {
+				t.Errorf("frame = %x, want %x", f.Payload, w)
+			}
+		}
+	}
+	send(c.ArmSiren(ctx, 29, SirenArming{ExitDelay: 10 * time.Second, EntryDelay: 300 * time.Second,
+		Alert: 7 * time.Second, Active: []int{23, 14, 99}, Delayed: []int{23}}),
+		[]byte{0x55, 0x04, 10, 255, 4, 0x05, 0x64, 0x02, 0, 0, 0, 0, 0, 0, 0, 0x05, 0, 0, 0, 0, 0, 0, 0, 0x04})
+	send(c.ArmSiren(ctx, 29, SirenArming{Quiet: true}),
+		[]byte{0x55, 0x04, 0, 0, 0, 0, 0x64, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+	send(c.SirenEntryDelay(ctx, 29), []byte{0x55, 0x05, 0x04})
+	send(c.SirenAlert(ctx, 29), []byte{0x55, 0x05, 0x05})
+	send(c.StopSiren(ctx, 29), []byte{0x55, 0x05, 0x00})
+	send(c.RelaySensorAlarm(ctx, 29, 23), []byte{0x55, 0x01, 0, 0, 0, 0, 0x42, 0}, []byte{0x55, 0x06})
+	if err := c.ArmSiren(ctx, 23, SirenArming{}); err == nil {
+		t.Error("a door was armed as a siren")
+	}
+
+	// Its state reports come out as events.
+	mcu.rx(charmux.ManagedFrame{GWDst: 1, GWSrc: 6, Counter: 50, Src: 6, Flags: 0x0086, WFlags: 0x01,
+		Payload: []byte{0x55, 0x01, 1, 2, 3, 4, 0, 0x04}})
+	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.SirenState != "entry_delay" {
+		t.Errorf("event = %+v, want siren 29 in its entry delay", ev)
 	}
 }
 

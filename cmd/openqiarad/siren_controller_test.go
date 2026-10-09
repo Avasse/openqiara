@@ -2,248 +2,117 @@ package main
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
-	"sync"
+	"slices"
 	"testing"
-	"time"
-
-	"github.com/caligone/openqiara/internal/camera"
-	"github.com/caligone/openqiara/internal/config"
 )
 
-// fakeCam capture les appels SRN pour assertions.
-type fakeCam struct {
-	sensors []camera.Sensor
-
-	mu    sync.Mutex // les bips arrivent d'une goroutine
-	beeps []int
-
-	triggerSirenAlarmCalls []triggerAlarmCall
-	stopSirenCalls         []int
-
-	// erreurs simulées
-	triggerSirenAlarmErr error
-	stopSirenErr         error
+// fakeSiren records what the mirror of Alarmo asks of the siren.
+type fakeSiren struct {
+	absent bool
+	state  string
+	calls  []string
 }
 
-type triggerAlarmCall struct {
-	id       int
-	duration time.Duration
-}
-
-func (f *fakeCam) CachedSensors() []camera.Sensor { return f.sensors }
-
-func (f *fakeCam) BeepSiren(_ context.Context, id int) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.beeps = append(f.beeps, id)
+func (f *fakeSiren) Present() bool { return !f.absent }
+func (f *fakeSiren) State() string { return f.state }
+func (f *fakeSiren) Arm(night, delayed bool) error {
+	call := "arm"
+	if night {
+		call += " night"
+	}
+	if delayed {
+		call += " delayed"
+	}
+	f.calls = append(f.calls, call)
 	return nil
 }
+func (f *fakeSiren) EntryDelay() error { f.calls = append(f.calls, "entry delay"); return nil }
+func (f *fakeSiren) Alert() error      { f.calls = append(f.calls, "alert"); return nil }
+func (f *fakeSiren) Wail() error       { f.calls = append(f.calls, "wail"); return nil }
+func (f *fakeSiren) Disarm() error     { f.calls = append(f.calls, "disarm"); return nil }
 
-func (f *fakeCam) beepCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return len(f.beeps)
+func (f *fakeSiren) take() []string {
+	c := f.calls
+	f.calls = nil
+	return c
 }
 
-func (f *fakeCam) TriggerSirenAlarm(_ context.Context, id int, d time.Duration) error {
-	f.triggerSirenAlarmCalls = append(f.triggerSirenAlarmCalls, triggerAlarmCall{id, d})
-	return f.triggerSirenAlarmErr
-}
-
-func (f *fakeCam) StopSiren(_ context.Context, id int) error {
-	f.stopSirenCalls = append(f.stopSirenCalls, id)
-	return f.stopSirenErr
-}
-
-// helper : construit un controller synchrone pour tests inline.
-func newTestController(t *testing.T, cam sirenAPI, sirenSounds string) (*sirenController, *config.Store) {
-	t.Helper()
-	store := config.NewStore(t.TempDir() + "/config.json")
-	if sirenSounds != "" {
-		if err := store.Update(func(c *config.Config) {
-			c.Alarm.SirenSounds = sirenSounds
-		}); err != nil {
-			t.Fatalf("Update store: %v", err)
-		}
-	}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	sc := newSirenController(context.Background(), cam, store, logger)
+func newTestController(siren *fakeSiren) *sirenController {
+	sc := newSirenController(context.Background(), siren, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	sc.synchronous = true
-	sc.every = map[string]time.Duration{"arming": 10 * time.Millisecond, "pending": 10 * time.Millisecond}
-	t.Cleanup(sc.silence)
-	return sc, store
+	return sc
 }
 
-func srnSensor(id int) camera.Sensor {
-	return camera.Sensor{ID: id, Type: "SRN", Reachable: true}
+func expectCalls(t *testing.T, siren *fakeSiren, want ...string) {
+	t.Helper()
+	if got := siren.take(); !slices.Equal(got, want) {
+		t.Errorf("siren calls = %q, want %q", got, want)
+	}
 }
 
-// TestSirenReadyBootSkipsDisarmed : au boot, le premier callback "disarmed"
-// est ignoré (sirenReady=false → skip).
-func TestSirenReadyBootSkipsDisarmed(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-	sc, _ := newTestController(t, cam, "all")
+// TestMirrorFollowsAlarmo: each Alarmo state is a native command; an armed
+// siren is disarmed before it takes the mode's sensors.
+func TestMirrorFollowsAlarmo(t *testing.T) {
+	siren := &fakeSiren{}
+	sc := newTestController(siren)
 
+	sc.Handle("arming", "disarmed")
+	expectCalls(t, siren, "arm delayed")
+	sc.Handle("armed_away", "arming")
+	expectCalls(t, siren, "disarm", "arm")
+	sc.Handle("armed_night", "armed_away")
+	expectCalls(t, siren, "disarm", "arm night")
+	sc.Handle("pending", "armed_night")
+	expectCalls(t, siren, "entry delay")
+	siren.state = "entry_delay"
+	sc.Handle("triggered", "pending")
+	expectCalls(t, siren, "alert")
+	sc.Handle("disarmed", "triggered")
+	expectCalls(t, siren, "disarm")
+	sc.Handle("disarmed", "disarmed")
+	expectCalls(t, siren)
+}
+
+// TestTriggeredSirenNotArmed: a siren Alarmo did not arm natively plays
+// the test sound at full power instead.
+func TestTriggeredSirenNotArmed(t *testing.T) {
+	siren := &fakeSiren{state: "off"}
+	sc := newTestController(siren)
+	sc.Handle("triggered", "disarmed")
+	expectCalls(t, siren, "wail")
+}
+
+// TestSirenSoundsNone: siren_sounds none keeps the siren off whatever
+// Alarmo does.
+func TestSirenSoundsNone(t *testing.T) {
+	siren := &fakeSiren{absent: true}
+	sc := newTestController(siren)
+	sc.Handle("armed_away", "disarmed")
+	sc.Handle("triggered", "armed_away")
+	expectCalls(t, siren, "disarm", "disarm")
+}
+
+// TestMirrorReconciled: a siren armed while Alarmo is disarmed is
+// disarmed; off while Alarmo is armed (it rebooted), it is armed again,
+// once.
+func TestMirrorReconciled(t *testing.T) {
+	siren := &fakeSiren{}
+	sc := newTestController(siren)
 	sc.Handle("disarmed", "")
+	siren.take()
+	sc.SirenState("armed")
+	expectCalls(t, siren, "disarm")
+	sc.SirenState("off")
+	expectCalls(t, siren)
 
-	if len(cam.stopSirenCalls) != 0 {
-		t.Errorf("expected no StopSiren call at boot, got %d", len(cam.stopSirenCalls))
-	}
-}
-
-// TestNoTransitionSkipsAll : newState == prevState → rien.
-func TestNoTransitionSkipsAll(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-	sc, _ := newTestController(t, cam, "all")
-	sc.sirenReady = true // skip boot guard
-
-	sc.Handle("armed_away", "armed_away")
-
-	if cam.beepCount()+len(cam.triggerSirenAlarmCalls)+len(cam.stopSirenCalls) != 0 {
-		t.Errorf("expected no calls on identity transition")
-	}
-}
-
-// TestDelaysBeep : les délais d'armement et d'entrée font biper la sirène
-// jusqu'à la transition suivante ; le wail part après le dernier bip.
-func TestDelaysBeep(t *testing.T) {
-	for _, state := range []string{"arming", "pending"} {
-		cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-		sc, _ := newTestController(t, cam, "all")
-		sc.sirenReady = true
-
-		sc.Handle(state, "armed_away")
-		time.Sleep(50 * time.Millisecond)
-		if n := cam.beepCount(); n < 2 {
-			t.Errorf("%s: %d beeps, want a series", state, n)
-		}
-		sc.Handle("triggered", state)
-		n := cam.beepCount()
-		time.Sleep(30 * time.Millisecond)
-		if cam.beepCount() != n {
-			t.Errorf("%s: beeps after the wail", state)
-		}
-		if len(cam.triggerSirenAlarmCalls) != 1 {
-			t.Errorf("%s: wail calls = %d, want 1", state, len(cam.triggerSirenAlarmCalls))
-		}
-	}
-}
-
-// TestNoBeepWhenSirenSoundsAlarmOnly : siren_sounds=alarm_only → délais silencieux.
-func TestNoBeepWhenSirenSoundsAlarmOnly(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-	sc, _ := newTestController(t, cam, "alarm_only")
-	sc.sirenReady = true
-
-	sc.Handle("pending", "armed_away")
-	time.Sleep(30 * time.Millisecond)
-
-	if n := cam.beepCount(); n != 0 {
-		t.Errorf("alarm_only mode should not beep, got %d", n)
-	}
-}
-
-// TestTriggeredFiresWail : "triggered" → TriggerSirenAlarm avec wail duration.
-func TestTriggeredFiresWail(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-	sc, store := newTestController(t, cam, "all")
-	sc.sirenReady = true
-	_ = store.Update(func(c *config.Config) { c.Alarm.WailDurationSeconds = 15 })
-
-	sc.Handle("triggered", "pending")
-
-	if len(cam.triggerSirenAlarmCalls) != 1 {
-		t.Fatalf("expected 1 TriggerSirenAlarm call, got %d", len(cam.triggerSirenAlarmCalls))
-	}
-	call := cam.triggerSirenAlarmCalls[0]
-	if call.id != 32 {
-		t.Errorf("expected addr=32, got %d", call.id)
-	}
-	if call.duration != 15*time.Second {
-		t.Errorf("expected duration=15s, got %v", call.duration)
-	}
-}
-
-// TestTriggeredFiresEvenInAlarmOnlyMode : siren_sounds=alarm_only laisse passer le wail.
-func TestTriggeredFiresEvenInAlarmOnlyMode(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-	sc, _ := newTestController(t, cam, "alarm_only")
-	sc.sirenReady = true
-
-	sc.Handle("triggered", "pending")
-
-	if len(cam.triggerSirenAlarmCalls) != 1 {
-		t.Errorf("alarm_only mode MUST still fire wail on triggered, got %d calls", len(cam.triggerSirenAlarmCalls))
-	}
-}
-
-// TestDisarmedStopsSiren : disarmed → StopSiren.
-func TestDisarmedStopsSiren(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-	sc, _ := newTestController(t, cam, "all")
-	sc.sirenReady = true
-
-	sc.Handle("disarmed", "triggered")
-
-	if len(cam.stopSirenCalls) != 1 || cam.stopSirenCalls[0] != 32 {
-		t.Errorf("expected StopSiren(32), got %v", cam.stopSirenCalls)
-	}
-	if n := cam.beepCount(); n != 0 {
-		t.Errorf("disarm should not beep, got %d", n)
-	}
-}
-
-// TestNoneModeAlwaysStops : siren_sounds=none → StopSiren peu importe la transition.
-func TestNoneModeAlwaysStops(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{srnSensor(32)}}
-	sc, _ := newTestController(t, cam, "none")
-	sc.sirenReady = true
-
-	sc.Handle("triggered", "pending")
-
-	if len(cam.stopSirenCalls) != 1 {
-		t.Errorf("none mode should cut wail on triggered, got %d StopSiren", len(cam.stopSirenCalls))
-	}
-	if len(cam.triggerSirenAlarmCalls) != 0 {
-		t.Errorf("none mode must NOT fire wail, got %v", cam.triggerSirenAlarmCalls)
-	}
-}
-
-// TestNoSRNNoOp : aucun SRN dans CachedSensors → pas d'appel SRN.
-func TestNoSRNNoOp(t *testing.T) {
-	cam := &fakeCam{sensors: []camera.Sensor{
-		{ID: 14, Type: "DWS"},
-		{ID: 29, Type: "KPD"},
-	}}
-	sc, _ := newTestController(t, cam, "all")
-	sc.sirenReady = true
-
-	sc.Handle("triggered", "pending")
-	sc.Handle("disarmed", "triggered")
-
-	total := cam.beepCount() + len(cam.triggerSirenAlarmCalls) + len(cam.stopSirenCalls)
-	if total != 0 {
-		t.Errorf("no SRN paired → expected 0 calls, got %d total", total)
-	}
-}
-
-// TestWailErrorDoesntPanic : si TriggerSirenAlarm renvoie une erreur, on log
-// mais on ne panique pas.
-func TestWailErrorDoesntPanic(t *testing.T) {
-	cam := &fakeCam{
-		sensors:              []camera.Sensor{srnSensor(32)},
-		triggerSirenAlarmErr: errors.New("boom"),
-	}
-	sc, _ := newTestController(t, cam, "all")
-	sc.sirenReady = true
-
-	// Ne panique pas — c'est le test (synchronous=true).
-	sc.Handle("triggered", "pending")
-
-	if len(cam.triggerSirenAlarmCalls) != 1 {
-		t.Errorf("expected the call to happen even with error")
-	}
+	sc.Handle("armed_night", "disarmed")
+	siren.take()
+	sc.SirenState("off")
+	expectCalls(t, siren, "arm night")
+	sc.SirenState("off")
+	expectCalls(t, siren)
+	sc.SirenState("armed")
+	expectCalls(t, siren)
 }

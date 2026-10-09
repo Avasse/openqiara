@@ -38,14 +38,18 @@ func (c *stubCamera) StopPairing(context.Context, int) error  { return nil }
 func (c *stubCamera) DeleteSensor(context.Context, int) error { return nil }
 func (c *stubCamera) SendPKT(context.Context, []byte) error   { return nil }
 func (c *stubCamera) TriggerSiren(context.Context, int) error { return nil }
-func (c *stubCamera) BeepSiren(context.Context, int) error    { return nil }
 func (c *stubCamera) TriggerSirenAlarm(context.Context, int, time.Duration) error {
 	return nil
 }
-func (c *stubCamera) StopSiren(context.Context, int) error   { return nil }
-func (c *stubCamera) SetShutter(context.Context, bool) error { return nil }
-func (c *stubCamera) Events() <-chan camera.SensorEvent      { return nil }
-func (c *stubCamera) Close() error                           { return nil }
+func (c *stubCamera) StopSiren(context.Context, int) error                    { return nil }
+func (c *stubCamera) ArmSiren(context.Context, int, camera.SirenArming) error { return nil }
+func (c *stubCamera) SirenEntryDelay(context.Context, int) error              { return nil }
+func (c *stubCamera) SirenAlert(context.Context, int) error                   { return nil }
+func (c *stubCamera) RelaySensorAlarm(context.Context, int, int) error        { return nil }
+func (c *stubCamera) RequestSirenState(context.Context, int) error            { return nil }
+func (c *stubCamera) SetShutter(context.Context, bool) error                  { return nil }
+func (c *stubCamera) Events() <-chan camera.SensorEvent                       { return nil }
+func (c *stubCamera) Close() error                                            { return nil }
 
 // newTestServer monte un Server complet avec un mux réel, pour pouvoir
 // router de vraies requêtes. Le store pointe vers un fichier temporaire.

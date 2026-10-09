@@ -861,17 +861,18 @@ func (s *Server) handleUpdateAlarm(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Bornes raisonnables : 0-600s pour les délais alarme, 1-60s pour le wail.
-	if body.ArmingDelaySeconds != nil && (*body.ArmingDelaySeconds < 0 || *body.ArmingDelaySeconds > 600) {
-		writeErr(w, http.StatusBadRequest, "arming_delay_seconds doit être entre 0 et 600")
+	// Bornes de la sirène, qui compte les délais sur un octet (secondes)
+	// et l'alarme par pas de 2 s.
+	if body.ArmingDelaySeconds != nil && (*body.ArmingDelaySeconds < 0 || *body.ArmingDelaySeconds > 255) {
+		writeErr(w, http.StatusBadRequest, "arming_delay_seconds doit être entre 0 et 255")
 		return
 	}
-	if body.PendingDelaySeconds != nil && (*body.PendingDelaySeconds < 0 || *body.PendingDelaySeconds > 600) {
-		writeErr(w, http.StatusBadRequest, "pending_delay_seconds doit être entre 0 et 600")
+	if body.PendingDelaySeconds != nil && (*body.PendingDelaySeconds < 0 || *body.PendingDelaySeconds > 255) {
+		writeErr(w, http.StatusBadRequest, "pending_delay_seconds doit être entre 0 et 255")
 		return
 	}
-	if body.WailDurationSeconds != nil && (*body.WailDurationSeconds < 1 || *body.WailDurationSeconds > 60) {
-		writeErr(w, http.StatusBadRequest, "wail_duration_seconds doit être entre 1 et 60")
+	if body.WailDurationSeconds != nil && (*body.WailDurationSeconds < 1 || *body.WailDurationSeconds > 510) {
+		writeErr(w, http.StatusBadRequest, "wail_duration_seconds doit être entre 1 et 510")
 		return
 	}
 	err := s.store.Update(func(cfg *config.Config) {

@@ -2199,6 +2199,19 @@
               "armed_night"
             ]
           },
+          "siren_state": {
+            "type": "string",
+            "description": "Sirène : l'état qu'elle rapporte. Elle tient l'alarme (délais, alarme) et le suit seule si la caméra tombe.",
+            "enum": [
+              "off",
+              "test",
+              "exit_delay",
+              "armed",
+              "entry_delay",
+              "alert",
+              "alert_over"
+            ]
+          },
           "last_seen": {
             "type": "integer",
             "format": "int64",
@@ -2526,26 +2539,26 @@
               "alarm_only",
               "none"
             ],
-            "description": "Quels sons la sirène émet.\n\n- `all` — bips pendant les délais d'armement et d'entrée, plus l'alarme\n- `alarm_only` — uniquement l'alarme\n- `none` — silencieuse",
+            "description": "Quels sons la sirène émet.\n\n- `all` — la sirène joue ses bips pendant les délais de sortie et d'entrée, puis l'alarme\n- `alarm_only` — délais sans bips (hypothèse, à vérifier sur le matériel), puis l'alarme\n- `none` — la sirène n'est jamais armée ni déclenchée",
             "default": "all"
           },
           "arming_delay_seconds": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 600,
-            "description": "Délai de sortie après un armement local."
+            "maximum": 255,
+            "description": "Délai de sortie après un armement au clavier, compté par la sirène (255 s au plus)."
           },
           "pending_delay_seconds": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 600,
-            "description": "Délai d'entrée avant le déclenchement de la sirène."
+            "maximum": 255,
+            "description": "Délai d'entrée avant l'alarme, compté par la sirène (255 s au plus)."
           },
           "wail_duration_seconds": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 60,
-            "description": "Durée de la sirène, 63 s au plus."
+            "maximum": 510,
+            "description": "Durée de l'alarme, comptée par la sirène par pas de 2 s (510 s au plus). Le test plein volume, lui, s'arrête à 63 s."
           }
         }
       },
@@ -2576,26 +2589,26 @@
               "alarm_only",
               "none"
             ],
-            "description": "Quels sons la sirène émet.\n\n- `all` — bips d'armement et de désarmement, plus l'alarme\n- `alarm_only` — uniquement l'alarme\n- `none` — silencieuse",
+            "description": "Quels sons la sirène émet.\n\n- `all` — la sirène joue ses bips pendant les délais de sortie et d'entrée, puis l'alarme\n- `alarm_only` — délais sans bips (hypothèse, à vérifier sur le matériel), puis l'alarme\n- `none` — la sirène n'est jamais armée ni déclenchée",
             "default": "all"
           },
           "arming_delay_seconds": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 600,
-            "description": "Délai de sortie après un armement local."
+            "maximum": 255,
+            "description": "Délai de sortie après un armement au clavier, compté par la sirène (255 s au plus)."
           },
           "pending_delay_seconds": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 600,
-            "description": "Délai d'entrée avant le déclenchement de la sirène."
+            "maximum": 255,
+            "description": "Délai d'entrée avant l'alarme, compté par la sirène (255 s au plus)."
           },
           "wail_duration_seconds": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 60,
-            "description": "Durée de la sirène, 63 s au plus."
+            "maximum": 510,
+            "description": "Durée de l'alarme, comptée par la sirène par pas de 2 s (510 s au plus). Le test plein volume, lui, s'arrête à 63 s."
           }
         }
       },

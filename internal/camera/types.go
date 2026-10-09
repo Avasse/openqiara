@@ -12,8 +12,11 @@ type Sensor struct {
 	Motion    bool   `json:"motion"` // PIR: motion detected
 	// No tamper field: DomusRF sensors expose no usable tamper state (issue #30).
 	KPDState string `json:"kpd_state,omitempty"` // KPD: "disarmed", "armed_away", "armed_night"
-	LastSeen int64  `json:"last_seen"`
-	Label    string `json:"label,omitempty"` // user-defined name
+	// SirenState is what the siren reports: off, test, exit_delay, armed,
+	// entry_delay, alert, alert_over (alert ended, still set off).
+	SirenState string `json:"siren_state,omitempty"`
+	LastSeen   int64  `json:"last_seen"`
+	Label      string `json:"label,omitempty"` // user-defined name
 }
 
 // SensorEvent is emitted when a sensor state changes.

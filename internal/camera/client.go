@@ -39,14 +39,28 @@ type Client interface {
 	// TriggerSiren plays the siren's discreet test sound.
 	TriggerSiren(ctx context.Context, sensorID int) error
 
-	// BeepSiren plays one short, discreet beep.
-	BeepSiren(ctx context.Context, sensorID int) error
-
-	// TriggerSirenAlarm fires the full-power wail for duration.
+	// TriggerSirenAlarm plays the test sound at full power for duration.
 	TriggerSirenAlarm(ctx context.Context, sensorID int, duration time.Duration) error
 
-	// StopSiren stops whatever the siren plays.
+	// StopSiren disarms the siren and stops whatever it plays.
 	StopSiren(ctx context.Context, sensorID int) error
+
+	// ArmSiren arms the siren, which then keeps the alarm's delays and
+	// sounds, and hears the sensors itself when the gateway is gone.
+	ArmSiren(ctx context.Context, sensorID int, a SirenArming) error
+
+	// SirenEntryDelay starts an armed siren's entry delay.
+	SirenEntryDelay(ctx context.Context, sensorID int) error
+
+	// SirenAlert sets an armed siren off.
+	SirenAlert(ctx context.Context, sensorID int) error
+
+	// RelaySensorAlarm hands an armed siren a sensor's alarm: the siren
+	// decides between the entry delay and the alert.
+	RelaySensorAlarm(ctx context.Context, sirenID, sensorID int) error
+
+	// RequestSirenState asks the siren for its state (Sensor.SirenState).
+	RequestSirenState(ctx context.Context, sensorID int) error
 
 	// SetShutter opens or closes the camera shutter.
 	SetShutter(ctx context.Context, open bool) error

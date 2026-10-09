@@ -453,17 +453,14 @@ func main() {
 		}
 		return alarm.SensorConfig{}
 	}
-	// sirenCtrl pilote la sirène physique lors des transitions d'état de
-	// la centrale d'alarme. Appelé depuis les deux modes (standalone via
-	// alarmStateCallback, alarmo via MQTT). Logique testée dans
-	// siren_controller_test.go.
-	sirenCtrl := newSirenController(ctx, cam, store, logger)
-	handleSirenForAlarmState := sirenCtrl.Handle
+	// The siren keeps the alarm (internal/alarm): the standalone engine
+	// drives it, and in alarmo mode sirenCtrl mirrors Alarmo's state on it.
+	siren := nativeSiren{ctx: ctx, cam: cam, store: store}
+	sirenCtrl := newSirenController(ctx, siren, logger)
 
 	alarmStateCallback := func(snap alarm.Snapshot) {
 		logger.Info("alarm state", "state", snap.State, "prev", snap.PreviousState, "trigger", snap.TriggeredBy, "remaining", snap.TimerRemaining)
 		setAlarmState(string(snap.State))
-		handleSirenForAlarmState(string(snap.State), string(snap.PreviousState))
 		if webSrv == nil {
 			for _, p := range pubs {
 				_ = p.PublishAlarmState(ctx, string(snap.State))
@@ -488,14 +485,12 @@ func main() {
 	// shadow its state, causing drift and useless persistence churn.
 	var alarmEngine *alarm.Engine
 	if store.Get().AlarmMode() == "standalone" {
-		alarmEngine = alarm.New("/data/openqiara_alarm.json", alarmConfigFor, alarmStateCallback, logger)
+		alarmEngine = alarm.New("/data/openqiara_alarm.json", siren, alarmConfigFor, alarmStateCallback, logger)
 		cfg := store.Get()
 		alarmEngine.SetTimings(cfg.ArmingDelay(), cfg.PendingDelay())
 		if err := alarmEngine.Load(); err != nil {
 			logger.Warn("alarm: load failed, starting fresh", "error", err)
 		}
-		alarmEngine.Start()
-		defer alarmEngine.Stop()
 		if webSrv != nil {
 			webSrv.SetAlarmProvider(&alarmAdapter{eng: alarmEngine})
 			webSrv.SetAlarmState(string(alarmEngine.Snapshot().State))
@@ -596,8 +591,7 @@ func main() {
 			for _, p := range pubs {
 				_ = p.PublishAlarmState(ctx, state)
 			}
-			// Pilotage sirène physique sur les transitions alarmo.
-			handleSirenForAlarmState(state, prev)
+			sirenCtrl.Handle(state, prev)
 			setAlarmState(state)
 		})
 		logger.Info("subscribed to alarmo state", "topic", alarmoStateTopic)
@@ -610,7 +604,17 @@ func main() {
 		}
 	}()
 
-	forwardEvents(ctx, cam, pubs, webSrv, alarmEngine, store, dispatchAlarmCommand, logger)
+	// The siren's reports: its state is the alarm's in standalone mode,
+	// and is reconciled with Alarmo's in alarmo mode.
+	onSirenState := func(state string) {
+		if alarmEngine != nil && store.Get().AlarmMode() == "standalone" {
+			alarmEngine.HandleSirenState(alarm.SirenState(state))
+		} else {
+			sirenCtrl.SirenState(state)
+		}
+	}
+
+	forwardEvents(ctx, cam, pubs, webSrv, alarmEngine, store, dispatchAlarmCommand, onSirenState, logger)
 }
 
 // createCamera makes openqiarad the radio gateway. It fails while
@@ -661,6 +665,7 @@ func forwardEvents(
 	alarmEngine *alarm.Engine,
 	store *config.Store,
 	dispatchCmd func(cmd string, source alarm.Source),
+	onSirenState func(state string),
 	logger *slog.Logger,
 ) {
 	sig := make(chan os.Signal, 1)
@@ -690,6 +695,9 @@ func forwardEvents(
 				// Push the single-sensor update to SSE clients (no MCU call).
 				if webSrv != nil {
 					webSrv.PublishEvent("sensor", evt.Sensor)
+				}
+				if evt.Sensor.Type == "SRN" && evt.Sensor.SirenState != "" {
+					onSirenState(evt.Sensor.SirenState)
 				}
 				// Only feed the local alarm engine in standalone mode.
 				// In alarmo mode, Alarmo has its own trigger logic via HA.

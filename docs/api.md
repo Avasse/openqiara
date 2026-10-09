@@ -110,9 +110,10 @@ pas un état, elles déclenchent un effet.
 
 `GET /sensors` renvoie l'état connu de chaque capteur, sans interroger la
 radio : les capteurs le signalent eux-mêmes, et les changements arrivent
-par le flux SSE. `night_allowed` : capteur ignoré quand l'alarme
-(`standalone`) est armée pour la nuit. `instant` : capteur qui déclenche
-la sirène sans délai d'entrée (une fenêtre), en `standalone` aussi.
+par le flux SSE. `night_allowed` : capteur ignoré quand l'alarme est
+armée pour la nuit. `instant` : capteur qui déclenche l'alarme sans
+délai d'entrée (une fenêtre). Les deux sont transmis à la sirène, qui
+tient l'alarme. `siren_state` (sirène) : l'état qu'elle rapporte.
 
 ### Appairage
 
@@ -173,7 +174,7 @@ Contraintes validées côté serveur (`400` sinon) :
 - `password` admin — 8 caractères minimum, ou chaîne vide pour **désactiver
   l'authentification**.
 - `mode` ∈ `standalone`, `alarmo` · `siren_sounds` ∈ `all`, `alarm_only`,
-  `none` · délais `0..600 s` · wail `1..60 s`.
+  `none` · délais `0..255 s` (comptés par la sirène) · alarme `1..510 s`.
 
 Notes :
 

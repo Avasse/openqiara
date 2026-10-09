@@ -80,11 +80,27 @@ Commandes via l'API : `POST /api/v1/commands/siren/test` (bip de test discret)
 et `POST /api/v1/commands/siren/alarm_test` (wail d'intrusion). La durée du
 wail part dans la trame radio et la sirène s'arrête d'elle-même.
 
-Pendant les délais de la centrale (armement, puis entrée après un
-déclenchement), openqiarad fait biper la sirène : un bip discret de
-250 ms toutes les 5 s à l'armement, toutes les 2 s au délai d'entrée.
-openqiarad porte les délais, en mode `standalone` comme avec Alarmo ; la
-sirène ne fait que jouer les sons. `siren_sounds: alarm_only` les coupe.
+### SRN — La sirène tient l'alarme
+
+Comme sous fbxhome, c'est la sirène qui tient l'alarme (RE et tests
+matériels d'octobre 2026). openqiarad l'arme en lui donnant les délais et
+la liste des capteurs surveillés ; elle compte ensuite elle-même le délai de
+sortie (bips réguliers), le délai d'entrée (bips d'avertissement) et la
+durée de l'alarme.
+
+- **Mode `standalone`** : la sirène est la centrale. openqiarad l'arme
+  (au clavier avec le délai de sortie, depuis HA ou HomeKit sans), lui
+  relaie chaque détection et publie l'état qu'elle rapporte.
+- **Mode `alarmo`** : Alarmo décide, la sirène suit son état, armée en
+  miroir. Réglez les délais d'openqiara comme ceux d'Alarmo.
+- **Si la caméra tombe** (panne, Wi-Fi, openqiarad arrêté), les capteurs
+  s'adressent directement à la sirène armée, qui déclenche seule.
+  Désarmée, elle ne fait rien.
+
+Par capteur, `night_allowed` le retire de la surveillance la nuit et
+`instant` le fait déclencher sans délai d'entrée (une fenêtre). Les
+délais sont limités à 255 s, l'alarme à 510 s. `siren_sounds: none`
+laisse la sirène hors de l'alarme.
 
 ### SRN — Recovery après débranchement physique
 
