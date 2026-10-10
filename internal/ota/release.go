@@ -53,8 +53,8 @@ type Release struct {
 // CheckResult est ce qu'on retourne à l'UI : version courante + dernière
 // release disponible + diff binaire.
 type CheckResult struct {
-	Current      string  `json:"current"`            // version qui tourne actuellement
-	Latest       Release `json:"latest"`             // dernière release publiée
-	UpdateNeeded bool    `json:"update_needed"`      // current != latest.TagName et current != "dev"
-	CheckedAt    string  `json:"checked_at"`         // ISO 8601 de quand on a checké
+	Current      string  `json:"current"`       // version qui tourne actuellement
+	Latest       Release `json:"latest"`        // dernière release publiée
+	UpdateNeeded bool    `json:"update_needed"` // current != latest.TagName et current != "dev"
+	CheckedAt    string  `json:"checked_at"`    // ISO 8601 de quand on a checké
 }

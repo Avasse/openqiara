@@ -86,9 +86,13 @@ func main() {
 				fmt.Printf("Nodes: %d bytes\n", len(nodes))
 				for i := 0; i < len(nodes); i += 9 {
 					end := i + 9
-					if end > len(nodes) { end = len(nodes) }
+					if end > len(nodes) {
+						end = len(nodes)
+					}
 					fmt.Printf("  [%2d]: ", i)
-					for _, b := range nodes[i:end] { fmt.Printf("%02x ", b) }
+					for _, b := range nodes[i:end] {
+						fmt.Printf("%02x ", b)
+					}
 					fmt.Println()
 				}
 			}

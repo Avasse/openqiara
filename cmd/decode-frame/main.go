@@ -1,10 +1,12 @@
 package main
+
 import (
-	"fmt"
 	"encoding/hex"
-	"os"
+	"fmt"
 	"github.com/caligone/openqiara/internal/charmux"
+	"os"
 )
+
 func main() {
 	for _, h := range os.Args[1:] {
 		data, _ := hex.DecodeString(h)

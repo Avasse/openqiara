@@ -55,12 +55,10 @@ func fakeCamera(ctx context.Context) (<-chan camera.Sample, error) {
 	return out, nil
 }
 
-func TestRTSPServesAudio(t *testing.T) {
-	if e, err := aacenc.New(aacenc.LC, audioRate, audioBitrate); err != nil {
-		t.Skip(err) // libfdk-aac absent: the camera has it
-	} else {
-		e.Close()
-	}
+// play starts a server on the fake camera, plays it with a real client
+// for up to 3 s and counts the video and audio packets.
+func play(t *testing.T, audio bool) (medias int, video, sound int32) {
+	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -70,15 +68,14 @@ func TestRTSPServesAudio(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	hub := mediahub.New("fake", fakeCamera, nil, logger)
-	srv := New(Config{Listen: addr, Path: "openqiara", Audio: true}, hub, logger)
+	srv := New(Config{Listen: addr, Path: "openqiara", Audio: audio}, hub, logger)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	host, port, _ := net.SplitHostPort(addr)
-	c := gortsplib.Client{Scheme: "rtsp", Host: net.JoinHostPort(host, port)}
+	c := gortsplib.Client{Scheme: "rtsp", Host: addr}
 	if err := c.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -91,29 +88,42 @@ func TestRTSPServesAudio(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(desc.Medias) != 2 {
-		t.Fatalf("%d medias, want video and audio", len(desc.Medias))
-	}
 	if err := c.SetupAll(desc.BaseURL, desc.Medias); err != nil {
 		t.Fatal(err)
 	}
-	var video, audio atomic.Int32
+	var v, a atomic.Int32
 	c.OnPacketRTPAny(func(m *description.Media, f format.Format, _ *rtp.Packet) {
 		if _, ok := f.(*format.MPEG4Audio); ok {
-			audio.Add(1)
+			a.Add(1)
 		} else {
-			video.Add(1)
+			v.Add(1)
 		}
 	})
 	if _, err := c.Play(nil); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) && (video.Load() < 5 || audio.Load() < 5) {
+	enough := func() bool { return v.Load() >= 5 && (!audio || a.Load() >= 5) }
+	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline) && !enough(); {
 		time.Sleep(50 * time.Millisecond)
 	}
-	if video.Load() < 5 || audio.Load() < 5 {
-		t.Fatalf("got %d video and %d audio packets", video.Load(), audio.Load())
+	return len(desc.Medias), v.Load(), a.Load()
+}
+
+func TestRTSPServesVideo(t *testing.T) {
+	medias, video, _ := play(t, false)
+	if medias != 1 || video < 5 {
+		t.Fatalf("%d medias, %d video packets; want 1 and some", medias, video)
 	}
-	t.Logf("%d video, %d audio packets", video.Load(), audio.Load())
+}
+
+func TestRTSPServesAudio(t *testing.T) {
+	if e, err := aacenc.New(aacenc.LC, audioRate, audioBitrate); err != nil {
+		t.Skip(err) // libfdk-aac absent: the camera has it
+	} else {
+		e.Close()
+	}
+	medias, video, audio := play(t, true)
+	if medias != 2 || video < 5 || audio < 5 {
+		t.Fatalf("%d medias, %d video and %d audio packets", medias, video, audio)
+	}
 }

@@ -144,8 +144,8 @@ type Installer struct {
 	// En test on injecte un no-op pour ne pas se tuer soi-même.
 	onComplete func()
 
-	mu     sync.Mutex
-	status InstallStatus
+	mu      sync.Mutex
+	status  InstallStatus
 	running bool
 }
 
@@ -492,4 +492,3 @@ func copyFile(src, dst string) error {
 	}
 	return out.Close()
 }
-

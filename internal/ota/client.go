@@ -22,16 +22,16 @@ import (
 // ARM ~10 MB sur la cam à ~100 KB/s = ~100s, timeout 10 min pour avoir
 // de la marge).
 type Client struct {
-	repo         string        // ex "Caligone/openqiara"
-	currentVer   string        // version courante du binaire qui tourne
-	http         *http.Client  // API JSON: CheckLatest, fetchChecksum
-	downloadHTTP *http.Client  // assets binaires: download de la release
+	repo         string       // ex "Caligone/openqiara"
+	currentVer   string       // version courante du binaire qui tourne
+	http         *http.Client // API JSON: CheckLatest, fetchChecksum
+	downloadHTTP *http.Client // assets binaires: download de la release
 	cacheTTL     time.Duration
 	logger       *slog.Logger
 
-	mu        sync.Mutex
-	cached    *CheckResult // last result, may be nil
-	cachedAt  time.Time
+	mu       sync.Mutex
+	cached   *CheckResult // last result, may be nil
+	cachedAt time.Time
 }
 
 // NewClient construit un client OTA. currentVersion = ce que main.BuildInfo()

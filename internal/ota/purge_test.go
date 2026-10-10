@@ -21,14 +21,14 @@ func TestPurgeStaleBinaries(t *testing.T) {
 	_ = os.MkdirAll(filepath.Dir(target), 0755)
 
 	files := []string{
-		"openqiarad",           // current — keep (symlink target)
-		"openqiarad.old",       // backup — keep
-		"openqiarad.new",       // orphan staged — purge
-		"openqiarad.bak-rtsp",  // manual leftover — purge
-		"openqiarad.pre-rtsp",  // manual leftover — purge
-		"openqiarad_new",       // manual leftover — purge
-		"boot.sh",              // not an openqiarad* file — keep
-		"chunk_aa",             // unrelated — keep
+		"openqiarad",          // current — keep (symlink target)
+		"openqiarad.old",      // backup — keep
+		"openqiarad.new",      // orphan staged — purge
+		"openqiarad.bak-rtsp", // manual leftover — purge
+		"openqiarad.pre-rtsp", // manual leftover — purge
+		"openqiarad_new",      // manual leftover — purge
+		"boot.sh",             // not an openqiarad* file — keep
+		"chunk_aa",            // unrelated — keep
 	}
 	for _, f := range files {
 		if err := os.WriteFile(filepath.Join(stage, f), []byte("x"), 0755); err != nil {

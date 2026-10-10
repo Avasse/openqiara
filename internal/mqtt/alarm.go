@@ -31,11 +31,11 @@ func (p *HAPublisher) PublishAlarmDiscovery(ctx context.Context, sensor camera.S
 	topic := fmt.Sprintf("homeassistant/alarm_control_panel/openqiara_%d/config", sensor.ID)
 
 	disc := alarmDiscoveryPayload{
-		Name:         "OpenQiara Alarm",
-		UniqueID:     "openqiara_alarm",
-		StateTopic:   fmt.Sprintf("%s/alarm/state", p.prefix),
-		CommandTopic: fmt.Sprintf("%s/alarm/set", p.prefix),
-		CodeArmReq:   false,
+		Name:          "OpenQiara Alarm",
+		UniqueID:      "openqiara_alarm",
+		StateTopic:    fmt.Sprintf("%s/alarm/state", p.prefix),
+		CommandTopic:  fmt.Sprintf("%s/alarm/set", p.prefix),
+		CodeArmReq:    false,
 		CodeDisarmReq: false,
 		Device: haDevice{
 			Identifiers:  []string{"openqiara_alarm"},

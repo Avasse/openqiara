@@ -95,10 +95,13 @@ func merge(ctx context.Context, a, b <-chan camera.Sample) <-chan camera.Sample 
 
 // Hub multiplexes one camera pipeline to many subscribers.
 type Hub struct {
-	name    string // for logs
-	source  Source
-	log     *slog.Logger
-	resumer Resumer
+	name   string // for logs
+	source Source
+	// staleCheck is how often a running pipeline asks the resumer whether
+	// the stream stalled.
+	staleCheck time.Duration
+	log        *slog.Logger
+	resumer    Resumer
 
 	last atomic.Int64 // unix nanos of the last sample
 
@@ -119,11 +122,12 @@ func New(name string, source Source, resumer Resumer, logger *slog.Logger) *Hub 
 		logger = slog.Default()
 	}
 	return &Hub{
-		name:    name,
-		source:  source,
-		log:     logger,
-		resumer: resumer,
-		subs:    make(map[*subscription]struct{}),
+		name:       name,
+		source:     source,
+		staleCheck: 5 * time.Second,
+		log:        logger,
+		resumer:    resumer,
+		subs:       make(map[*subscription]struct{}),
 	}
 }
 
@@ -189,10 +193,6 @@ func (h *Hub) LastSample() time.Time {
 	return time.Time{}
 }
 
-// staleCheck is how often a running pipeline asks the resumer whether the
-// stream stalled.
-const staleCheck = 5 * time.Second
-
 // broadcast delivers a sample to every subscriber, dropping it for any
 // subscriber whose buffer is full rather than blocking the parser.
 func (h *Hub) broadcast(sample camera.Sample) {
@@ -219,7 +219,7 @@ func (h *Hub) runPipeline(ctx context.Context) {
 		h.log.Warn("mediahub: source failed", "source", h.name, "error", err)
 		return
 	}
-	check := time.NewTicker(staleCheck)
+	check := time.NewTicker(h.staleCheck)
 	defer check.Stop()
 	for {
 		select {

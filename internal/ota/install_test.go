@@ -17,10 +17,10 @@ import (
 // fakeGitHub mock both /releases/latest (CheckLatest) et
 // /releases/download/.../<asset> (Installer.run).
 type fakeGitHub struct {
-	srv      *httptest.Server
-	binData  []byte
-	binHash  string
-	tag      string
+	srv     *httptest.Server
+	binData []byte
+	binHash string
+	tag     string
 }
 
 func newFakeGitHub(t *testing.T, tag string) *fakeGitHub {

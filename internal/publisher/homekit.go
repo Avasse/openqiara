@@ -72,9 +72,9 @@ type HomeKitPublisher struct {
 	// Command handler shared with all rebuild iterations.
 	cmds *CommandHandler
 
-	mu      sync.Mutex
-	server  *hap.Server
-	cancel  context.CancelFunc // cancels the current server's goroutine
+	mu     sync.Mutex
+	server *hap.Server
+	cancel context.CancelFunc // cancels the current server's goroutine
 
 	// Accessories by sensor ID — replaced on every rebuild.
 	contacts map[int]*accessory.ContactSensor

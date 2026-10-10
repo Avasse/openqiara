@@ -35,7 +35,7 @@ type srtpVideoSender struct {
 
 	// 90 kHz monotonic clock for RTP timestamps. Started when the
 	// session begins; we offset every Send by the elapsed wall time.
-	startTime  time.Time
+	startTime       time.Time
 	timestampOffset uint32 // initial random value, RFC 3550 §5.1
 
 	// Stats — sampled by SendNAL, logged periodically by a separate
@@ -54,7 +54,7 @@ type srtpVideoSender struct {
 	// stream we generate by playing it back with ffplay.
 	debugDump *os.File
 
-	mu sync.Mutex
+	mu     sync.Mutex
 	closed bool
 }
 

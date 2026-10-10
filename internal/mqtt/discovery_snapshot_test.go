@@ -12,7 +12,8 @@ import (
 
 // updateSnapshots permet de regénérer les fichiers golden quand la doc
 // HA discovery évolue intentionnellement.
-//   go test ./internal/mqtt -update
+//
+//	go test ./internal/mqtt -update
 var updateSnapshots = flag.Bool("update", false, "update golden snapshot files")
 
 // snapshotTest compare le payload marshalé à un fichier golden dans testdata/.

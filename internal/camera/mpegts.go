@@ -56,8 +56,8 @@ type MPEGTSParser struct {
 }
 
 type pesBuf struct {
-	buf       []byte
-	pts       int64
+	buf        []byte
+	pts        int64
 	hasPayload bool
 }
 
