@@ -185,9 +185,17 @@ done
 sleep 2
 EUPID=$(cat /tmp/key.eupid 2>/dev/null || echo "")
 MAC=$(cat /sys/class/net/ssv0/address 2>/dev/null || echo "")
+# openqiarad reads the main stream (1080p, multicast 9600) and the
+# microphone (9700). The 720p and 360p encodes fed hls only: off, about a
+# quarter of a core and 14 MB saved (measured 2026-10-10), person
+# detection unaffected. The fallback source "hls" still needs the 720p.
+HLS_FALLBACK=
+grep -q '"source": *"hls"' /data/openqiara.json 2>/dev/null && HLS_FALLBACK=1
+STREAMS="--no-720p --no-360p"
+[ -n "$HLS_FALLBACK" ] && STREAMS="--no-360p"
 if [ -n "$EUPID" ] && [ -n "$MAC" ]; then
     /usr/bin/hlcamd -d 75 --iv-detection 1 \
-        --flip-flop-detect 1 --eupid "$EUPID" --mac "$MAC" --use-h264 \
+        --flip-flop-detect 1 --eupid "$EUPID" --mac "$MAC" --use-h264 $STREAMS \
         >> /data/hlcamd.log 2>&1 &
 fi
 sleep 2
@@ -195,7 +203,7 @@ sleep 2
 # openqiarad now serves that HLS itself (internal/hlsserver), from what
 # hlcamd multicasts: hls only runs for the fallback source "hls"
 # (homekit.camera.source in openqiara.json).
-if grep -q '"source": *"hls"' /data/openqiara.json 2>/dev/null; then
+if [ -n "$HLS_FALLBACK" ]; then
     mkdir -p /tmp/out_stream/stream/720p
     hls -p /tmp/out_stream/stream/720p -r 720 --use-h264 &
 fi

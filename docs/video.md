@@ -11,7 +11,7 @@ openqiarad (mediahub) ──→ HomeKit (SRTP, AAC-ELD)
                      └─→ HLS /stream/ (MPEG-TS, H.264 + AAC-LC) → navigateur, VLC, Home Assistant
 ```
 
-Le SoC Sigmastar encode en H.264 via son encodeur hardware (`hlcamd --use-h264`, cf [`../scripts/camera_boot.sh`](../scripts/camera_boot.sh)). `hlcamd` envoie ses flux en multicast sur le loopback ; openqiarad les lit et sert lui-même le HLS. Le segmenteur `hls` du constructeur ne tourne plus, sauf avec la source de secours `homekit.camera.source: "hls"`.
+Le SoC Sigmastar encode en H.264 via son encodeur hardware (`hlcamd --use-h264 --no-720p --no-360p`, cf [`../scripts/camera_boot.sh`](../scripts/camera_boot.sh)) : seul le flux principal 1080p sert, couper les deux autres encodages économise environ un quart de cœur et 14 Mo. `hlcamd` envoie ses flux en multicast sur le loopback ; openqiarad les lit et sert lui-même le HLS. Le segmenteur `hls` du constructeur ne tourne plus, sauf avec la source de secours `homekit.camera.source: "hls"`.
 
 ## Activation du flux
 
