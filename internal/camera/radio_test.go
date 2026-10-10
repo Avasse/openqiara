@@ -144,8 +144,9 @@ func TestRadioEvents(t *testing.T) {
 	siren := srn
 	siren.Battery = 76 // last level saved: no 0 published before its heartbeat
 	c, mcu, store := newRadio(t, kpd, dws, siren)
-	if s, _ := c.ReadSensor(context.Background(), 29); s == nil || s.Battery != 76 {
-		t.Errorf("siren at start = %+v, want its saved battery", s)
+	// Saved raw, shown in percent as fbxhome did: 76×98/255+2 = 31.
+	if s, _ := c.ReadSensor(context.Background(), 29); s == nil || s.Battery != 31 {
+		t.Errorf("siren at start = %+v, want its saved battery, 31 %%", s)
 	}
 	if f := mcu.sent(t); f.Route != 6 || !bytes.Equal(f.Payload, []byte{0x55, 0x06}) {
 		t.Fatalf("first frame = %+v, want the siren asked for its state", f)
@@ -180,7 +181,7 @@ func TestRadioEvents(t *testing.T) {
 	// A battery report must not replay the keypad's last button: main
 	// turns any KPDState into an alarm command.
 	mcu.rx(fromSensor(2, 13, 0x82, 0x81, 0xff))
-	if ev := nextEvent(t, c); ev.Sensor.KPDState != "" || ev.Sensor.Battery != 255 {
+	if ev := nextEvent(t, c); ev.Sensor.KPDState != "" || ev.Sensor.Battery != 100 {
 		t.Errorf("event = %+v, want a battery update without action", ev)
 	}
 	if b := store.Get().Sensors[0].Battery; b != 255 {
@@ -540,6 +541,41 @@ func TestRadioBackPublishesFreshState(t *testing.T) {
 	for range 2 {
 		if ev := nextEvent(t, c); ev.Sensor.Open {
 			t.Fatalf("event = %+v: stale open published", ev)
+		}
+	}
+}
+
+// TestBatteryPercent: the raw level as fbxhome showed it.
+func TestBatteryPercent(t *testing.T) {
+	for _, tc := range []struct {
+		typ      string
+		raw, pct int
+	}{
+		{"DWS", 255, 100}, {"PIR", 0, 0}, {"KPD", 128, 50},
+		{"SRN", 73, 30}, {"SRN", 81, 33}, {"SRN", 1, 1}, {"SRN", 255, 100},
+	} {
+		if got := batteryPercent(tc.typ, tc.raw); got != tc.pct {
+			t.Errorf("%s %d: %d %%, want %d %%", tc.typ, tc.raw, got, tc.pct)
+		}
+	}
+}
+
+// TestRadioTemperature: 55 0a <t> is the sensor's temperature, signed, kept
+// for the next start.
+func TestRadioTemperature(t *testing.T) {
+	c, mcu, store := newRadio(t, dws, srn)
+	mcu.sent(t) // get-state
+	mcu.rx(fromSensor(6, 30, 0x01, 0x55, 0x0a, 25))
+	if ev := nextEvent(t, c); ev.SensorID != 29 || ev.Sensor.Temperature == nil || *ev.Sensor.Temperature != 25 {
+		t.Errorf("event = %+v, want the siren at 25 °C", ev)
+	}
+	mcu.rx(fromSensor(5, 31, 0x01, 0x55, 0x0a, 0xfd))
+	if ev := nextEvent(t, c); ev.SensorID != 23 || ev.Sensor.Temperature == nil || *ev.Sensor.Temperature != -3 {
+		t.Errorf("event = %+v, want the door at -3 °C", ev)
+	}
+	for _, se := range store.Get().Sensors {
+		if se.ID == 29 && (se.Temperature == nil || *se.Temperature != 25) {
+			t.Errorf("siren saved with %v, want 25", se.Temperature)
 		}
 	}
 }

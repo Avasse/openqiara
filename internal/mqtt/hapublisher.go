@@ -213,8 +213,6 @@ func (p *HAPublisher) republishDiscovery(ctx context.Context) {
 				p.log.Warn("extra discovery publish failed", "topic", extra.Topic, "error", err)
 			}
 		}
-		// The temperature entity came from fbxhome, gone: clear it from HA.
-		_ = p.publish(ctx, fmt.Sprintf("homeassistant/sensor/openqiara_%d_temperature/config", s.ID), []byte{}, retained)
 	}
 
 	shutterTopic, shutterPayload := ShutterDiscoveryPayload(p.prefix)
@@ -435,13 +433,13 @@ func marshalState(s camera.Sensor) ([]byte, error) {
 	var v any
 	switch s.Type {
 	case "DWS":
-		v = dwsState{Open: s.Open, Battery: s.Battery, Reachable: s.Reachable}
+		v = dwsState{Open: s.Open, Battery: s.Battery, Reachable: s.Reachable, Temperature: s.Temperature}
 	case "PIR":
-		v = pirState{Motion: s.Motion, Battery: s.Battery, Reachable: s.Reachable}
+		v = pirState{Motion: s.Motion, Battery: s.Battery, Reachable: s.Reachable, Temperature: s.Temperature}
 	case "SRN":
-		v = srnState{Active: s.SirenState == "alert", State: s.SirenState, Battery: s.Battery, Reachable: s.Reachable}
+		v = srnState{Active: s.SirenState == "alert", State: s.SirenState, Battery: s.Battery, Reachable: s.Reachable, Temperature: s.Temperature}
 	case "KPD":
-		v = kpdState{Battery: s.Battery, Reachable: s.Reachable}
+		v = kpdState{Battery: s.Battery, Reachable: s.Reachable, Temperature: s.Temperature}
 	default:
 		return nil, fmt.Errorf("unknown sensor type: %s", s.Type)
 	}

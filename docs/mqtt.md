@@ -80,13 +80,13 @@ Payload: {
 }
 ```
 
-State : `{"open": true, "battery": 255, "reachable": true}`
+State : `{"open": true, "battery": 100, "reachable": true, "temperature": 21}`
 
 ### PIR (binary_sensor)
 
 ```
 Topic:   homeassistant/binary_sensor/openqiara_<ID>/config
-State:   {"motion": true, "battery": 255, "reachable": true}
+State:   {"motion": true, "battery": 100, "reachable": true}
 ```
 
 ### SRN (siren)
@@ -139,16 +139,17 @@ Quand `alarm.mode = "alarmo"` :
 (heartbeat toutes les ~12 h). Une porte dont la pile est morte est donc
 signalée au plus tard le lendemain.
 
-Pour chaque capteur, une entité batterie :
+Pour chaque capteur, une entité batterie et une entité température :
 ```
 homeassistant/sensor/openqiara_<ID>_battery/config
+homeassistant/sensor/openqiara_<ID>_temperature/config
 ```
 
-Seule la sirène mesure sa pile ; PIR, DWS et clavier envoient 255, que
-l'entité affiche comme inconnu (la valeur brute reste dans les attributs).
-Il n'y a pas d'entité température : aucun capteur n'en envoie par radio.
-openqiarad efface l'ancienne entité `openqiara_<ID>_temperature` au
-démarrage.
+La batterie est en pourcentage, calculé comme fbxhome le faisait à partir
+du niveau que le capteur envoie dans ses heartbeats. Les capteurs envoient
+leur température d'eux-mêmes, rarement : l'entité reste « inconnue »
+jusqu'au premier envoi, puis la dernière valeur est gardée même après un
+redémarrage.
 
 ## Sync bidirectionnelle
 

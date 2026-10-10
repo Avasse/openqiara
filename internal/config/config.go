@@ -277,9 +277,12 @@ type SensorEntry struct {
 	// Radio is where the sensor sits on the radio network: set at
 	// pairing, imported from fbxhome.xml at the first start.
 	Radio RadioNode `json:"radio,omitzero"`
-	// Battery is the last level the sensor reported, kept across restarts:
-	// sensors report it every few hours only.
+	// Battery is the last raw level the sensor reported (0..255), kept
+	// across restarts: sensors report it every few hours only.
 	Battery int `json:"battery,omitempty"`
+	// Temperature is the last one the sensor reported, in °C; nil before
+	// the first. Kept across restarts, sensors send it rarely.
+	Temperature *int `json:"temperature,omitempty"`
 }
 
 // RadioNode is a sensor's place on the radio network. Addr 0 means none.

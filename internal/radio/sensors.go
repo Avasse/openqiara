@@ -38,10 +38,11 @@ const (
 	Disarmed   // keypad off button, or a code the keypad accepted
 	Emergency  // keypad panic
 	Tamper
-	SirenState // 0 off, 2 arming delay, 3 armed, 4 entry delay, 5 alert
-	Battery    // raw level: 255 on every PIR, DWS and keypad seen, 73 on a siren
-	Rebooted   // the sensor lost its bytecode and asked for it
-	NoBytecode // no bytecode for the firmware of a sensor that needs one
+	SirenState  // 0 off, 2 arming delay, 3 armed, 4 entry delay, 5 alert
+	Battery     // raw level: 255 on every PIR, DWS and keypad seen, 73 on a siren
+	Temperature // °C, signed: 55 0a <t>, sent by the sensor now and then
+	Rebooted    // the sensor lost its bytecode and asked for it
+	NoBytecode  // no bytecode for the firmware of a sensor that needs one
 
 	DeliveryFailed // a frame for this sensor never arrived
 	Unhandled      // a frame or state value outside what is understood
@@ -75,6 +76,11 @@ func (n *node) events(rx charmux.ManagedFrame) []Event {
 		// 55 01 <timestamp:4> <kind:2|signal:6> <value> [<code:2> 00 00]
 		// (fbxhome FUN_000b8bf8). Only the value carries meaning.
 		return []Event{n.state(p[7], p[8:])}
+
+	case rx.WFlags == wfApp && len(p) >= 3 && p[0] == 0x55 && p[1] == 0x0a:
+		// 55 0a <t> (fbxhome FUN_000bc84c, the siren; the other sensors'
+		// handlers alike): °C as read on the hardware, 25 then 24 indoors.
+		return []Event{{Addr: n.Addr, Kind: Temperature, Value: int(int8(p[2]))}}
 	}
 	return nil
 }

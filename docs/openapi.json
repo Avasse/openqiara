@@ -2172,10 +2172,17 @@
           "battery": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 255,
-            "description": "Niveau de pile envoyé par le capteur : un pourcentage pour la sirène, 255 (non mesuré) pour PIR, DWS et clavier.",
+            "maximum": 100,
+            "description": "Niveau de pile en pourcentage, calculé comme fbxhome le faisait. 0 tant que le capteur ne l'a pas envoyé.",
             "examples": [
               100
+            ]
+          },
+          "temperature": {
+            "type": "integer",
+            "description": "Température en °C, envoyée de temps en temps par le capteur. Absente tant qu'il n'en a envoyé aucune.",
+            "examples": [
+              21
             ]
           },
           "reachable": {

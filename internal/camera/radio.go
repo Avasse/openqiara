@@ -225,7 +225,7 @@ func (c *RadioClient) reload() {
 		}
 		s, ok := c.sensors[se.ID]
 		if !ok {
-			s = Sensor{ID: se.ID, Reachable: true, Battery: se.Battery}
+			s = Sensor{ID: se.ID, Reachable: true, Battery: batteryPercent(se.Type, se.Battery), Temperature: se.Temperature}
 		}
 		s.Type, s.ItemID = se.Type, se.Radio.UID
 		if se.Radio.Addr == 0 {
@@ -437,10 +437,16 @@ func (c *RadioClient) publish(ev radio.Event) {
 		c.emit(action)
 		return
 	case radio.Battery:
-		if ev.Value != s.Battery {
-			c.saveBattery(id, ev.Value)
+		if pct := batteryPercent(s.Type, ev.Value); pct != s.Battery {
+			s.Battery = pct
+			c.save(id, func(se *config.SensorEntry) { se.Battery = ev.Value })
 		}
-		s.Battery = ev.Value
+	case radio.Temperature:
+		if s.Temperature == nil || *s.Temperature != ev.Value {
+			t := ev.Value
+			s.Temperature = &t
+			c.save(id, func(se *config.SensorEntry) { se.Temperature = &t })
+		}
 	case radio.DeliveryFailed:
 		// Not a sign the sensor is gone (silenceLimit).
 		c.log.Warn("radio: frame not delivered", "id", id, "counter", ev.Value)
@@ -471,17 +477,33 @@ func (c *RadioClient) publish(ev radio.Event) {
 	}
 }
 
-// saveBattery keeps a sensor's battery level for the next start, which
-// would otherwise publish 0 until the sensor's next heartbeat, hours
-// later. Called with mu held.
-func (c *RadioClient) saveBattery(id, level int) {
+// batteryPercent is a sensor's raw battery level as fbxhome showed it:
+// raw×98/255+2 for a siren (HlSrn FUN_000bc20c, 0 and 1 as is),
+// raw×99/255+1 for the others (0xb4250); 255 is 100 %. 0, never reported,
+// stays 0.
+func batteryPercent(typ string, raw int) int {
+	switch {
+	case raw <= 0:
+		return 0
+	case typ == "SRN" && raw <= 1:
+		return raw
+	case typ == "SRN":
+		return raw*98/255 + 2
+	}
+	return raw*99/255 + 1
+}
+
+// save keeps what a sensor reported for the next start, which would
+// otherwise publish nothing until it reports again, hours later. Called
+// with mu held.
+func (c *RadioClient) save(id int, set func(*config.SensorEntry)) {
 	err := c.store.Update(func(cfg *config.Config) {
 		if i := slices.IndexFunc(cfg.Sensors, func(se config.SensorEntry) bool { return se.ID == id }); i >= 0 {
-			cfg.Sensors[i].Battery = level
+			set(&cfg.Sensors[i])
 		}
 	})
 	if err != nil {
-		c.log.Warn("radio: battery level not saved", "id", id, "error", err)
+		c.log.Warn("radio: sensor report not saved", "id", id, "error", err)
 	}
 }
 

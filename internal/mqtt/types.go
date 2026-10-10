@@ -27,28 +27,32 @@ type haDevice struct {
 
 // dwsState is the MQTT state payload for a door/window sensor.
 type dwsState struct {
-	Open      bool `json:"open"`
-	Battery   int  `json:"battery"`
-	Reachable bool `json:"reachable"`
+	Open        bool `json:"open"`
+	Battery     int  `json:"battery"`
+	Reachable   bool `json:"reachable"`
+	Temperature *int `json:"temperature,omitempty"` // °C, absent until reported
 }
 
 // pirState is the MQTT state payload for a motion sensor.
 type pirState struct {
-	Motion    bool `json:"motion"`
-	Battery   int  `json:"battery"`
-	Reachable bool `json:"reachable"`
+	Motion      bool `json:"motion"`
+	Battery     int  `json:"battery"`
+	Reachable   bool `json:"reachable"`
+	Temperature *int `json:"temperature,omitempty"` // °C, absent until reported
 }
 
 // srnState is the MQTT state payload for a siren.
 type srnState struct {
-	Active    bool   `json:"active"`          // wailing
-	State     string `json:"state,omitempty"` // as the siren reports it (camera.Sensor.SirenState)
-	Battery   int    `json:"battery"`
-	Reachable bool   `json:"reachable"`
+	Active      bool   `json:"active"`          // wailing
+	State       string `json:"state,omitempty"` // as the siren reports it (camera.Sensor.SirenState)
+	Battery     int    `json:"battery"`
+	Reachable   bool   `json:"reachable"`
+	Temperature *int   `json:"temperature,omitempty"` // °C, absent until reported
 }
 
 // kpdState is the MQTT state payload for a keypad event.
 type kpdState struct {
-	Battery   int  `json:"battery"`
-	Reachable bool `json:"reachable"`
+	Battery     int  `json:"battery"`
+	Reachable   bool `json:"reachable"`
+	Temperature *int `json:"temperature,omitempty"` // °C, absent until reported
 }

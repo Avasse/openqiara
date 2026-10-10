@@ -89,7 +89,7 @@ type ExtraDiscovery struct {
 	Payload []byte
 }
 
-// BuildExtraDiscoveryTopics returns additional HA discovery configs (battery), JSON-encoded.
+// BuildExtraDiscoveryTopics returns additional HA discovery configs (battery, temperature), JSON-encoded.
 func BuildExtraDiscoveryTopics(prefix string, sensor camera.Sensor) []ExtraDiscovery {
 	extras := buildExtraDiscoveryTopics(prefix, sensor)
 	result := make([]ExtraDiscovery, 0, len(extras))
@@ -103,7 +103,7 @@ func BuildExtraDiscoveryTopics(prefix string, sensor camera.Sensor) []ExtraDisco
 	return result
 }
 
-// buildExtraDiscoveryTopics returns additional HA discovery configs (battery).
+// buildExtraDiscoveryTopics returns additional HA discovery configs (battery, temperature).
 func buildExtraDiscoveryTopics(prefix string, sensor camera.Sensor) []struct {
 	Topic   string
 	Payload discoveryPayload
@@ -125,12 +125,30 @@ func buildExtraDiscoveryTopics(prefix string, sensor camera.Sensor) []struct {
 	}{
 		Topic: fmt.Sprintf("homeassistant/sensor/openqiara_%d_battery/config", sensor.ID),
 		Payload: discoveryPayload{
-			Name:        name + " Batterie",
-			UniqueID:    fmt.Sprintf("openqiara_%s_%d_battery", typeLower, sensor.ID),
-			DeviceClass: "battery",
-			StateTopic:  st,
-			// PIR, DWS and keypads send 255, a level no sensor measures: unknown.
-			ValueTemplate:       "{{ value_json.battery if value_json.battery <= 100 else None }}",
+			Name:                name + " Batterie",
+			UniqueID:            fmt.Sprintf("openqiara_%s_%d_battery", typeLower, sensor.ID),
+			DeviceClass:         "battery",
+			UnitOfMeasurement:   "%",
+			StateTopic:          st,
+			ValueTemplate:       "{{ value_json.battery }}",
+			JSONAttributesTopic: st,
+			Device:              device,
+		},
+	})
+
+	// Temperature sensor: unknown until the sensor sends one.
+	extras = append(extras, struct {
+		Topic   string
+		Payload discoveryPayload
+	}{
+		Topic: fmt.Sprintf("homeassistant/sensor/openqiara_%d_temperature/config", sensor.ID),
+		Payload: discoveryPayload{
+			Name:                name + " Température",
+			UniqueID:            fmt.Sprintf("openqiara_%s_%d_temperature", typeLower, sensor.ID),
+			DeviceClass:         "temperature",
+			UnitOfMeasurement:   "°C",
+			StateTopic:          st,
+			ValueTemplate:       "{{ value_json.temperature if value_json.temperature is defined else None }}",
 			JSONAttributesTopic: st,
 			Device:              device,
 		},
