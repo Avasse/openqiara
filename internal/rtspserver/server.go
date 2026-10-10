@@ -1,14 +1,12 @@
 // Package rtspserver exposes the camera's H.264 stream as a standard RTSP
-// service, reusing the same HLS→MPEG-TS→NAL pipeline that feeds the
-// HomeKit SRTP path. Unlike the HLS endpoint, this output is video-only
-// (no AAC), so downstream RTSP consumers (Scrypted, Frigate, VLC) don't
-// trip over the camera's headerless AAC track. Latency is ~1s instead of
-// the ~5s inherent to HLS, since we packetize NAL units directly rather
-// than serving 1s segments.
+// service for Scrypted, Frigate or VLC, from the media hub that feeds the
+// HomeKit path too. With the multicast source, the microphone comes along
+// as AAC-LC (RFC 3640), encoded here from the hub's PCM.
 package rtspserver
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -18,7 +16,11 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/bluenviron/gortsplib/v5/pkg/format/rtph264"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtpmpeg4audio"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
 
+	"github.com/caligone/openqiara/internal/aacenc"
+	"github.com/caligone/openqiara/internal/camera"
 	"github.com/caligone/openqiara/internal/mediahub"
 )
 
@@ -48,7 +50,17 @@ type Config struct {
 	// Path is the RTSP stream path, e.g. "openqiara" →
 	// rtsp://host:8554/openqiara.
 	Path string
+	// Audio adds the microphone, when the hub carries it (multicast
+	// source) and libfdk-aac is at hand.
+	Audio bool
 }
+
+// The microphone as RTSP serves it: AAC-LC 16 kHz mono, one 64 ms access
+// unit per packet.
+const (
+	audioRate    = 16000
+	audioBitrate = 32000
+)
 
 // Server serves a single H.264 stream over RTSP. The camera pipeline runs
 // only while at least one client is reading, mirroring the on-demand
@@ -62,6 +74,7 @@ type Server struct {
 	mu       sync.Mutex
 	stream   *gortsplib.ServerStream
 	forma    *format.H264
+	audio    *format.MPEG4Audio // nil: video only
 	desc     *description.Session
 	readers  int
 	cancelPL context.CancelFunc // cancels the running pipeline goroutine
@@ -114,6 +127,23 @@ func (s *Server) Start(ctx context.Context) error {
 		Formats: []format.Format{s.forma},
 	}
 	s.desc = &description.Session{Medias: []*description.Media{medi}}
+	if s.cfg.Audio {
+		if enc, err := aacenc.New(aacenc.LC, audioRate, audioBitrate); err != nil {
+			s.log.Warn("rtsp: no AAC encoder, video only", "error", err)
+		} else {
+			enc.Close()
+			s.audio = &format.MPEG4Audio{
+				PayloadTyp: 97,
+				Config: &mpeg4audio.AudioSpecificConfig{
+					Type: mpeg4audio.ObjectTypeAACLC, SampleRate: audioRate, ChannelConfig: 1,
+				},
+				SizeLength: 13, IndexLength: 3, IndexDeltaLength: 3,
+			}
+			s.desc.Medias = append(s.desc.Medias, &description.Media{
+				Type: description.MediaTypeAudio, Formats: []format.Format{s.audio},
+			})
+		}
+	}
 
 	s.rsrv = &gortsplib.Server{
 		Handler:     s,
@@ -224,10 +254,9 @@ func (s *Server) startPipeline() {
 	go s.runPipeline(plCtx)
 }
 
-// runPipeline subscribes to the shared media hub and packetizes its H.264
-// samples to RTP through gortsplib. The hub owns the watcher→parser chain
-// (shared with the HomeKit path); here we only group NAL into access units
-// and encode. Video only; audio samples are dropped.
+// runPipeline subscribes to the shared media hub and packetizes its
+// samples to RTP through gortsplib: NAL grouped into access units, PCM
+// encoded to AAC-LC when the stream has audio.
 func (s *Server) runPipeline(ctx context.Context) {
 	enc := &rtph264.Encoder{
 		PayloadType:       uint8(s.forma.PayloadTyp),
@@ -238,6 +267,17 @@ func (s *Server) runPipeline(ctx context.Context) {
 		return
 	}
 
+	var audio *audioEncoder
+	if s.audio != nil {
+		a, err := newAudioEncoder(s.audio)
+		if err != nil {
+			s.log.Warn("rtsp: audio encoder", "error", err)
+		} else {
+			audio = a
+			defer audio.close()
+		}
+	}
+
 	sub := s.hub.Subscribe()
 	defer sub.Close()
 
@@ -245,7 +285,7 @@ func (s *Server) runPipeline(ctx context.Context) {
 	// whole access unit ([][]byte), so we buffer NAL of the same PTS and
 	// flush the group when the PTS advances (or an AUD/new IDR marks a
 	// boundary).
-	s.log.Info("rtsp: pipeline started (via mediahub)", "hls", s.cfg.HLSPath)
+	s.log.Info("rtsp: pipeline started (via mediahub)", "audio", audio != nil)
 	var au [][]byte
 	var auPTS int64
 	havePTS := false
@@ -270,7 +310,10 @@ func (s *Server) runPipeline(ctx context.Context) {
 				return
 			}
 			if !sample.IsVideo {
-				continue // drop AAC — the reason the RTSP path exists
+				if audio != nil {
+					s.writeAudio(audio, sample)
+				}
+				continue
 			}
 			if havePTS && sample.PTS != auPTS {
 				flush()
@@ -346,4 +389,76 @@ func auHasParams(au [][]byte) bool {
 		}
 	}
 	return sps && pps
+}
+
+// audioEncoder turns the hub's PCM into AAC-LC RTP packets.
+type audioEncoder struct {
+	aac      *aacenc.Encoder
+	rtp      *rtpmpeg4audio.Encoder
+	pcm      []int16
+	framePTS int64 // 90 kHz PTS of pcm[0]
+}
+
+func newAudioEncoder(f *format.MPEG4Audio) (*audioEncoder, error) {
+	aac, err := aacenc.New(aacenc.LC, audioRate, audioBitrate)
+	if err != nil {
+		return nil, err
+	}
+	enc := &rtpmpeg4audio.Encoder{
+		PayloadType: f.PayloadTyp, SizeLength: f.SizeLength,
+		IndexLength: f.IndexLength, IndexDeltaLength: f.IndexDeltaLength,
+	}
+	if err := enc.Init(); err != nil {
+		aac.Close()
+		return nil, err
+	}
+	return &audioEncoder{aac: aac, rtp: enc}, nil
+}
+
+func (a *audioEncoder) close() { a.aac.Close() }
+
+// writeAudio encodes the PCM a frame at a time and writes it to the
+// readers. A frame's RTP timestamp comes from the PTS of its first sample,
+// on the same hlcamd clock as the video.
+func (s *Server) writeAudio(a *audioEncoder, sample camera.Sample) {
+	if len(a.pcm) == 0 {
+		a.framePTS = sample.PTS
+	}
+	for i := 0; i+1 < len(sample.Data); i += 2 {
+		a.pcm = append(a.pcm, int16(binary.LittleEndian.Uint16(sample.Data[i:])))
+	}
+	frame := aacenc.LC.FrameSamples()
+	for len(a.pcm) >= frame {
+		au, err := a.aac.Encode(a.pcm[:frame])
+		a.pcm = a.pcm[frame:]
+		pts := a.framePTS
+		a.framePTS += int64(frame) * 90000 / audioRate
+		if err != nil {
+			s.log.Warn("rtsp: aac encode", "error", err)
+			return
+		}
+		if len(au) == 0 {
+			continue
+		}
+		pkts, err := a.rtp.Encode([][]byte{au})
+		if err != nil {
+			s.log.Warn("rtsp: aac packetize", "error", err)
+			return
+		}
+		s.mu.Lock()
+		st := s.stream
+		s.mu.Unlock()
+		if st == nil {
+			return
+		}
+		ts := uint32(int64(s.randomStart) + pts*audioRate/90000)
+		for _, p := range pkts {
+			p.Timestamp = ts
+			if err := st.WritePacketRTP(s.desc.Medias[1], p); err != nil {
+				s.log.Warn("rtsp: audio write error", "error", err)
+				return
+			}
+		}
+	}
+	a.pcm = append(a.pcm[:0:0], a.pcm...)
 }

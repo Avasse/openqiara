@@ -279,7 +279,7 @@ func main() {
 		}
 	}
 
-	// RTSP server — standard H.264 stream (video only) for Scrypted/Frigate/VLC.
+	// RTSP server — standard H.264 + AAC-LC stream for Scrypted/Frigate/VLC.
 	if cfg.RTSP.Enabled {
 		listen := cfg.RTSP.Listen
 		if listen == "" {
@@ -297,6 +297,7 @@ func main() {
 			Listen:  listen,
 			Path:    cfg.RTSP.Path,
 			HLSPath: hlsPath,
+			Audio:   cfg.HomeKit.Camera.Source != "hls",
 		}, mediaHub, logger)
 		if err := rtspSrv.Start(ctx); err != nil {
 			logger.Error("failed to start RTSP server", "error", err)

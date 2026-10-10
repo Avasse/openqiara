@@ -54,12 +54,12 @@ L'endpoint `/api/v1/commands/stream/start` ouvre aussi le shutter automatiquemen
 ## RTSP (recommandé pour NVR / détection)
 
 Pour les consommateurs vidéo standard (Scrypted, Frigate, VLC, Home
-Assistant), openqiarad expose un serveur **RTSP** natif. Contrairement au
-HLS, ce flux est **vidéo seule** (pas d'AAC) — la piste audio du HLS n'a
-pas de global headers et casse le muxing RTSP chez la plupart des clients
-(`AAC with no global headers is currently not supported`). La latence est
-aussi bien plus faible (~1 s contre ~5 s en HLS), car les NAL H.264 sont
-packetisés directement en RTP sans passer par des segments de 1 s.
+Assistant), openqiarad expose un serveur **RTSP** natif : le 1080p de
+`hlcamd` et le micro en **AAC-LC 16 kHz mono** (RFC 3640), encodé par
+openqiarad avec la libfdk-aac de la caméra. La latence est bien plus faible
+qu'en HLS (~5 s) : les NAL H.264 partent en RTP dès que `hlcamd` les émet.
+Avec `homekit.camera.source: "hls"`, ou sans libfdk-aac, le flux est vidéo
+seule.
 
 Activation dans `openqiara.json` :
 

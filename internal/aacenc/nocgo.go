@@ -1,6 +1,6 @@
 //go:build !cgo
 
-package aaceld
+package aacenc
 
 import "errors"
 
@@ -11,8 +11,8 @@ import "errors"
 type Encoder struct{}
 
 // New always fails without cgo.
-func New(sampleRate, bitrate int) (*Encoder, error) {
-	return nil, errors.New("built without cgo: no AAC-ELD encoder")
+func New(p Profile, sampleRate, bitrate int) (*Encoder, error) {
+	return nil, errors.New("built without cgo: no AAC encoder")
 }
 
 // Encode is never reached.

@@ -156,7 +156,7 @@ func (c Config) AlarmoTopics() (command, state string) {
 }
 
 // RTSPConfig configures the optional standard RTSP server, which exposes
-// the camera's H.264 stream (video only, no AAC) for consumers like
+// the camera's H.264 stream and its microphone (AAC-LC) for consumers like
 // Scrypted, Frigate or VLC. Disabled by default.
 type RTSPConfig struct {
 	Enabled bool `json:"enabled,omitempty"`

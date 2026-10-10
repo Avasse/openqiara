@@ -1,15 +1,15 @@
 //go:build cgo
 
-// Package aaceld encodes PCM to AAC-ELD with libfdk-aac, the library the
-// camera's hls already uses (/usr/lib/libfdk-aac.so.2). HomeKit streams
-// camera audio in AAC-ELD: iOS refuses the Opus the accessory offers
-// (2026-10-10, raw SelectedRTPStreamConfiguration). No pure-Go encoder
-// exists.
+// Package aacenc encodes PCM to AAC with libfdk-aac, the library the
+// camera's hls already uses (/usr/lib/libfdk-aac.so.2): AAC-ELD for
+// HomeKit, which refuses the Opus the accessory offers (2026-10-10, raw
+// SelectedRTPStreamConfiguration), AAC-LC for RTSP. No pure-Go AAC-ELD
+// encoder exists.
 //
 // The library is opened at run time (dlopen): without it, openqiarad
 // starts all the same, without sound. The few declarations below follow
 // fdk-aac's aacenc_lib.h (2.0.x).
-package aaceld
+package aacenc
 
 /*
 #cgo linux LDFLAGS: -ldl
@@ -45,20 +45,21 @@ enum {
 	AACENC_AOT = 0x0100, AACENC_BITRATE = 0x0101, AACENC_SAMPLERATE = 0x0103,
 	AACENC_GRANULE_LENGTH = 0x0105, AACENC_CHANNELMODE = 0x0106,
 	AACENC_TRANSMUX = 0x0300,
-	AOT_ER_AAC_ELD = 39, MODE_1 = 1, TT_MP4_RAW = 0,
+	MODE_1 = 1, TT_MP4_RAW = 0,
 	IN_AUDIO_DATA = 0, OUT_BITSTREAM_DATA = 3,
 };
 
-// enc_open opens a mono AAC-ELD encoder, raw access units of frame
-// samples. Returns 0 or the failing step.
-static int enc_open(void **h, unsigned rate, unsigned bitrate, unsigned frame) {
+// enc_open opens a mono encoder for the audio object type aot, raw access
+// units of frame samples (0: the profile's default). Returns 0 or the
+// failing step.
+static int enc_open(void **h, unsigned aot, unsigned rate, unsigned bitrate, unsigned frame) {
 	if (pOpen(h, 0, 1)) return 1;
-	if (pSet(*h, AACENC_AOT, AOT_ER_AAC_ELD)) return 2;
+	if (pSet(*h, AACENC_AOT, aot)) return 2;
 	if (pSet(*h, AACENC_SAMPLERATE, rate)) return 3;
 	if (pSet(*h, AACENC_CHANNELMODE, MODE_1)) return 4;
 	if (pSet(*h, AACENC_BITRATE, bitrate)) return 5;
 	if (pSet(*h, AACENC_TRANSMUX, TT_MP4_RAW)) return 6;
-	if (pSet(*h, AACENC_GRANULE_LENGTH, frame)) return 7;
+	if (frame && pSet(*h, AACENC_GRANULE_LENGTH, frame)) return 7;
 	if (pEncode(*h, NULL, NULL, NULL, NULL)) return 8;
 	return 0;
 }
@@ -113,39 +114,45 @@ func load() error {
 	return loadErr
 }
 
-// Encoder turns 16-bit mono PCM into AAC-ELD access units. Not safe for
+// Encoder turns 16-bit mono PCM into AAC access units. Not safe for
 // concurrent use.
 type Encoder struct {
-	h   unsafe.Pointer
-	out []byte
+	h     unsafe.Pointer
+	frame int
+	out   []byte
 }
 
-// New opens an encoder for mono PCM at sampleRate, aiming at bitrate
-// (bit/s).
-func New(sampleRate, bitrate int) (*Encoder, error) {
+// New opens an encoder of profile p for mono PCM at sampleRate, aiming at
+// bitrate (bit/s).
+func New(p Profile, sampleRate, bitrate int) (*Encoder, error) {
 	if err := load(); err != nil {
 		return nil, err
 	}
-	e := &Encoder{out: make([]byte, 1024)}
-	if r := C.enc_open(&e.h, C.uint(sampleRate), C.uint(bitrate), FrameSamples); r != 0 {
+	e := &Encoder{frame: p.FrameSamples(), out: make([]byte, 2048)}
+	granule := 0
+	if p == ELD {
+		granule = e.frame
+	}
+	if r := C.enc_open(&e.h, C.uint(p), C.uint(sampleRate), C.uint(bitrate), C.uint(granule)); r != 0 {
 		if e.h != nil {
 			C.enc_close(&e.h)
 		}
-		return nil, fmt.Errorf("aac-eld encoder setup failed (step %d)", r)
+		return nil, fmt.Errorf("aac encoder setup failed (step %d)", r)
 	}
 	return e, nil
 }
 
-// Encode encodes FrameSamples samples. The access unit it returns is
-// valid until the next call; it is empty while the encoder fills up.
+// Encode encodes one frame, p.FrameSamples() samples. The access unit it
+// returns is valid until the next call; it is empty while the encoder
+// fills up.
 func (e *Encoder) Encode(pcm []int16) ([]byte, error) {
-	if len(pcm) != FrameSamples {
-		return nil, fmt.Errorf("aac-eld: %d samples, want %d", len(pcm), FrameSamples)
+	if len(pcm) != e.frame {
+		return nil, fmt.Errorf("aac: %d samples, want %d", len(pcm), e.frame)
 	}
 	n := C.enc_frame(e.h, (*C.short)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)),
 		(*C.uchar)(unsafe.Pointer(&e.out[0])), C.int(len(e.out)))
 	if n < 0 {
-		return nil, fmt.Errorf("aac-eld: encode error %#x", int(-n))
+		return nil, fmt.Errorf("aac: encode error %#x", int(-n))
 	}
 	return e.out[:n], nil
 }

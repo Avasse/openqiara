@@ -21,7 +21,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/srtp/v3"
 
-	"github.com/caligone/openqiara/internal/aaceld"
+	"github.com/caligone/openqiara/internal/aacenc"
 )
 
 // The microphone's PCM (camera.MulticastPCM) is encoded as it comes:
@@ -30,6 +30,7 @@ import (
 const (
 	aacSampleRate = 16000
 	aacBitrate    = 24000
+	eldFrame      = 480 // aacenc.ELD.FrameSamples()
 	// realAudioHold is how long after the last real packet silence stays
 	// off: PCM comes in 64 ms bursts.
 	realAudioHold = 200 * time.Millisecond
@@ -75,7 +76,7 @@ type srtpAudioSender struct {
 	mu       sync.Mutex
 	seq      uint16
 	ts       uint32          // next packet's RTP timestamp (random start per RFC 3550)
-	enc      *aaceld.Encoder // nil without libfdk-aac
+	enc      *aacenc.Encoder // nil without libfdk-aac
 	pcm      []int16         // PCM waiting for a whole frame
 	silence  []int16
 	lastReal time.Time // last packet of real audio
@@ -129,7 +130,7 @@ func newSRTPAudioSender(
 		return nil, fmt.Errorf("srtp audio: new session: %w", err)
 	}
 
-	enc, err := aaceld.New(aacSampleRate, aacBitrate)
+	enc, err := aacenc.New(aacenc.ELD, aacSampleRate, aacBitrate)
 	if err != nil {
 		logger.Warn("srtp audio: no AAC-ELD encoder, no sound", "error", err)
 		enc = nil
@@ -157,7 +158,7 @@ func newSRTPAudioSender(
 		seq:         uint16(time.Now().UnixNano() & 0xFFFF),
 		ts:          uint32(time.Now().UnixNano() & 0xFFFFFFFF),
 		enc:         enc,
-		silence:     make([]int16, aaceld.FrameSamples),
+		silence:     make([]int16, eldFrame),
 	}, nil
 }
 
@@ -166,7 +167,7 @@ func newSRTPAudioSender(
 func (s *srtpAudioSender) sendFrameLocked(pcm []int16) error {
 	au, err := s.enc.Encode(pcm)
 	ts := s.ts
-	s.ts += aaceld.FrameSamples
+	s.ts += eldFrame
 	if err != nil || len(au) == 0 {
 		return err
 	}
@@ -187,9 +188,9 @@ func (s *srtpAudioSender) SendPCM(data []byte) error {
 	for i := 0; i+1 < len(data); i += 2 {
 		s.pcm = append(s.pcm, int16(binary.LittleEndian.Uint16(data[i:])))
 	}
-	for len(s.pcm) >= aaceld.FrameSamples {
-		err := s.sendFrameLocked(s.pcm[:aaceld.FrameSamples])
-		s.pcm = s.pcm[aaceld.FrameSamples:]
+	for len(s.pcm) >= eldFrame {
+		err := s.sendFrameLocked(s.pcm[:eldFrame])
+		s.pcm = s.pcm[eldFrame:]
 		if err != nil {
 			return err
 		}
@@ -202,7 +203,7 @@ func (s *srtpAudioSender) SendPCM(data []byte) error {
 // RunSilence sends silence, a frame at a time, while no real audio comes,
 // until ctx is cancelled: iOS drops a session without audio.
 func (s *srtpAudioSender) RunSilence(ctx context.Context) {
-	every := time.Duration(aaceld.FrameSamples) * time.Second / aacSampleRate
+	every := time.Duration(eldFrame) * time.Second / aacSampleRate
 	if s.enc == nil {
 		every = 20 * time.Millisecond
 	}
