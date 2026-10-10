@@ -428,6 +428,7 @@ func main() {
 
 		webSrv.SetHLEventsDispatcher(ivDispatcher)
 		logger.Info("hl_event_collectd dispatcher attached", "iv_kinds", []string{"human", "pet"})
+		go serveEventCollector(ctx, ivDispatcher, logger)
 	}
 
 	// hlcamdResumer + mediaHub sont créés plus haut (avant HomeKit/RTSP).

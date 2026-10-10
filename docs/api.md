@@ -309,5 +309,7 @@ Trois propriétés à ne pas casser :
   cloud Free. Ce header n'est pas un résidu : le retirer fait échouer la
   livraison.
 
-Ce sont ces routes qui alimentent les events DWS, PIR, KPD et la détection
-IntelliVision.
+Depuis que openqiarad tient lui-même le nom `hl_event_collectd` sur fbxbus
+(`internal/fbxbus`), hlcamd lui remet ses détections IntelliVision
+directement et le collecteur vendor ne tourne plus : ces routes ne servent
+plus qu'en transition, et seront retirées.

@@ -202,8 +202,10 @@ préfixe `/api/v1`. Deux familles cohabitent :
   matériel déclenché : leur `200` signifie *accepté*, pas *effectué*.
 
 S'y ajoutent le flux SSE `/api/v1/events`, les segments HLS `/stream/*`, et
-les webhooks loopback `/events` + `/notifications` poussés par
-`hl_event_collectd` (hors versionnage, cf. `docs/api.md`).
+les webhooks loopback `/events` + `/notifications` de l'ancien
+`hl_event_collectd` (hors versionnage, en transition, cf. `docs/api.md`).
+hlcamd remet désormais ses détections à openqiarad sur fbxbus, où il tient le
+nom `hl_event_collectd` (`internal/fbxbus`).
 
 Les routes non versionnées ont été supprimées : elles répondent `410 Gone`.
 
