@@ -117,6 +117,7 @@ type Engine struct {
 	trigBy   int
 	deadline time.Time // end of the delay in progress
 	timerGen int       // bumped by every transition: stale timers do nothing
+	closed   bool      // Close: no more writes
 
 	armingDelay  time.Duration
 	pendingDelay time.Duration
@@ -413,6 +414,15 @@ func (e *Engine) afterLocked(d time.Duration, fn func()) {
 	})
 }
 
+// Close stops the engine's timers and writes: its state file stays as it
+// is.
+func (e *Engine) Close() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.timerGen++
+	e.closed = true
+}
+
 // transitionLocked changes state, persists, notifies.
 func (e *Engine) transitionLocked(newState State, reason string) {
 	old := e.state
@@ -444,6 +454,9 @@ func (e *Engine) snapshotLocked() Snapshot {
 }
 
 func (e *Engine) saveLocked() {
+	if e.closed {
+		return
+	}
 	p := persistedState{State: e.state, Mode: e.mode, ArmedAt: e.armedAt, TriggeredBy: e.trigBy}
 	data, err := json.MarshalIndent(p, "", "  ")
 	if err != nil {

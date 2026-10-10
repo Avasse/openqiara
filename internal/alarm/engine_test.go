@@ -40,6 +40,7 @@ func newTestEngine(t *testing.T, cfg map[int]SensorConfig) (*Engine, *fakeSiren)
 	t.Helper()
 	siren := &fakeSiren{}
 	e := New(filepath.Join(t.TempDir(), "alarm.json"), siren, func(id int) SensorConfig { return cfg[id] }, nil, nil)
+	t.Cleanup(e.Close) // before t.TempDir's: a late timer would write in it
 	return e, siren
 }
 

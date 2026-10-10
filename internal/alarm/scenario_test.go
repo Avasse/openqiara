@@ -35,6 +35,8 @@ func newRig(t *testing.T, sim *simSiren, standalone bool, path string) *rig {
 	if standalone {
 		r.engine = New(path, r.driver, func(id int) SensorConfig { return simSensors[id] }, nil, nil)
 		r.engine.SetTimings(sim.exit, sim.entry)
+		// Before t.TempDir's cleanup: a late timer would write in it.
+		t.Cleanup(r.engine.Close)
 	}
 	sim.set(func(s *simSiren) {
 		s.reverse = true
