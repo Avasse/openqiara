@@ -35,7 +35,10 @@ type mcuWatchdog struct {
 	every      time.Duration
 	health     func() error
 	takeOver   func() error // stops watchdog_mcu
-	logger     *slog.Logger
+	// tookOver runs once the watchdog is held: what only watchdog_mcu
+	// needed can go.
+	tookOver func()
+	logger   *slog.Logger
 }
 
 func newMCUWatchdog(health func() error, logger *slog.Logger) *mcuWatchdog {
@@ -49,7 +52,26 @@ func newMCUWatchdog(health func() error, logger *slog.Logger) *mcuWatchdog {
 			}
 			return nil
 		},
+		tookOver: func() { stopDeadCloud(logger) },
 	}
+}
+
+// deadCloud are the vendor's services for the dead Free/Qiara cloud.
+// myriadvpn, its VPN, kept watchdog_mcu feeding (and its death reboots
+// the camera while watchdog_mcu runs: stopped only once the watchdog is
+// ours). downloader polls an update URL our dnsmasq points at the camera
+// itself and writes what it gets to the SD card. srt-daemon serves an SRT
+// stream nothing uses since fbxhome is gone.
+var deadCloud = []string{"myriadvpn", "downloader", "srt-daemon"}
+
+func stopDeadCloud(logger *slog.Logger) {
+	for _, svc := range deadCloud {
+		if out, err := exec.Command("fbxupstartctl", "stop", svc).CombinedOutput(); err != nil {
+			logger.Warn("watchdog: stopping a dead cloud service failed", "service", svc, "error", err,
+				"output", strings.TrimSpace(string(out)))
+		}
+	}
+	logger.Info("watchdog: dead cloud services stopped", "services", deadCloud)
 }
 
 // run takes the watchdog over and feeds it until ctx ends. The vendor's
@@ -67,6 +89,9 @@ func (w *mcuWatchdog) run(ctx context.Context) {
 	}
 	defer conn.Close()
 	w.logger.Info("watchdog: feeding the MCU's watchdog", "every", w.every)
+	if w.tookOver != nil {
+		w.tookOver()
+	}
 
 	tick := time.NewTicker(w.every)
 	defer tick.Stop()

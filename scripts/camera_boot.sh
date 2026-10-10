@@ -265,7 +265,12 @@ fi
 (
     while :; do
         sleep 30
-        for svc in hlsystem hls-720p hls-360p hls-1080p fbxhome; do
+        # The dead cloud's services too, myriadvpn only once openqiarad
+        # feeds the MCU's watchdog (watchdog_mcu stopped): while
+        # watchdog_mcu runs, myriadvpn down means a reboot.
+        cloud="downloader srt-daemon"
+        pidof watchdog_mcu >/dev/null || cloud="$cloud myriadvpn"
+        for svc in hlsystem hls-720p hls-360p hls-1080p fbxhome $cloud; do
             if fbxupstartctl status "$svc" 2>/dev/null | grep -qE 'start(ed|ing)'; then
                 fbxupstartctl stop "$svc" 2>/dev/null
                 echo "[watchdog] stopped $svc at $(date -Iseconds)" >> /data/openqiarad.log
