@@ -268,7 +268,9 @@ fi
         # The dead cloud's services too, myriadvpn only once openqiarad
         # feeds the MCU's watchdog (watchdog_mcu stopped): while
         # watchdog_mcu runs, myriadvpn down means a reboot.
-        cloud="downloader srt-daemon"
+        # nginx-pub fronted fbxhome's API for the app (all its upstreams are
+        # gone) and cron restarts it every midnight: kept stopped too.
+        cloud="downloader srt-daemon nginx-pub"
         pidof watchdog_mcu >/dev/null || cloud="$cloud myriadvpn"
         for svc in hlsystem hls-720p hls-360p hls-1080p fbxhome $cloud; do
             if fbxupstartctl status "$svc" 2>/dev/null | grep -qE 'start(ed|ing)'; then
