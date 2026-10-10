@@ -65,6 +65,8 @@ type RadioClient struct {
 	// sirenCounter is the counter of the siren's last frame, to drop its
 	// answers that arrive out of order.
 	sirenCounter map[int]uint32
+	lastFrame    time.Time // last frame of a paired sensor
+	started      time.Time // when Connect took the radio
 	pairing      *pairing
 	failed       int // pairings that failed since the last success
 }
@@ -171,6 +173,7 @@ func (c *RadioClient) Connect(ctx context.Context) error {
 	_ = c.send(e.Start())
 	c.mu.Unlock()
 
+	c.started = time.Now()
 	c.wg.Add(1)
 	go c.run()
 	return nil
@@ -326,6 +329,7 @@ func (c *RadioClient) receive(data []byte) {
 		back, s.Reachable = !s.Reachable, true
 		c.sensors[id] = s
 		c.heard[id] = time.Now()
+		c.lastFrame = time.Now()
 	}
 	res := c.engine.Receive(time.Now(), *rx)
 	if c.staleSiren(id, *rx) {
@@ -739,6 +743,31 @@ func (c *RadioClient) DeleteSensor(_ context.Context, id int) error {
 		return err
 	}
 	c.Reload()
+	return nil
+}
+
+// RadioHealth tells whether the radio is alive, for the MCU watchdog: with
+// a siren served, which sends a keepalive every 10 min, a frame heard in
+// the last 30 min (from Connect on). Without one, sensors may stay silent
+// for hours: nothing to tell. It takes the gateway's lock: a gateway stuck
+// holding it blocks the call, which the watchdog takes as a failure.
+func (c *RadioClient) RadioHealth() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return errRadioStopped
+	}
+	siren := false
+	for _, n := range c.nodes {
+		siren = siren || n.Model == radio.SRN
+	}
+	since := c.lastFrame
+	if since.IsZero() {
+		since = c.started
+	}
+	if siren && time.Since(since) > 30*time.Minute {
+		return fmt.Errorf("radio: no frame for %s", time.Since(since).Round(time.Minute))
+	}
 	return nil
 }
 

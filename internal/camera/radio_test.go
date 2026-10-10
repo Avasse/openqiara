@@ -579,3 +579,26 @@ func TestRadioTemperature(t *testing.T) {
 		}
 	}
 }
+
+// TestRadioHealth: with a siren served, a radio silent for 30 min is not
+// healthy; without one, silence tells nothing.
+func TestRadioHealth(t *testing.T) {
+	c, _, _ := newRadio(t, dws, srn)
+	if err := c.RadioHealth(); err != nil {
+		t.Errorf("just connected: %v", err)
+	}
+	c.mu.Lock()
+	c.lastFrame = time.Now().Add(-31 * time.Minute)
+	c.mu.Unlock()
+	if c.RadioHealth() == nil {
+		t.Error("healthy after 31 min of silence with a siren")
+	}
+
+	d, _, _ := newRadio(t, dws)
+	d.mu.Lock()
+	d.lastFrame = time.Now().Add(-5 * time.Hour)
+	d.mu.Unlock()
+	if err := d.RadioHealth(); err != nil {
+		t.Errorf("no siren: %v", err)
+	}
+}

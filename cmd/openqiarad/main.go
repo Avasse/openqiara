@@ -632,6 +632,22 @@ func main() {
 		}
 	}
 
+	// The MCU's hardware watchdog, fed while openqiarad is healthy: the
+	// gateway and the alarm answer (each check takes their lock), hlcamd
+	// runs, and the radio is alive.
+	if rc, ok := cam.(*camera.RadioClient); ok {
+		wd := newMCUWatchdog(func() error {
+			if alarmEngine != nil {
+				alarmEngine.Snapshot()
+			}
+			if err := rc.RadioHealth(); err != nil {
+				return err
+			}
+			return hlcamdRunning()
+		}, logger)
+		go wd.run(ctx)
+	}
+
 	forwardEvents(ctx, cam, pubs, webSrv, alarmEngine, store, dispatchAlarmCommand, onSirenState, logger)
 }
 
