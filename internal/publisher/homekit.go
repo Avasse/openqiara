@@ -342,6 +342,7 @@ func (p *HomeKitPublisher) buildAndServe(sensors []camera.Sensor) error {
 	_ = os.MkdirAll(p.cfg.DataDir, 0755)
 
 	fs := hap.NewFsStore(p.cfg.DataDir)
+	bumpOnStaticChange(fs, p.log)
 	server, err := hap.NewServer(fs, bridge.A, accs...)
 	if err != nil {
 		return fmt.Errorf("homekit: create server: %w", err)
@@ -434,4 +435,23 @@ func (p *HomeKitPublisher) sensorListChanged(next []camera.Sensor) bool {
 		}
 	}
 	return false
+}
+
+// staticConfig names what the accessory advertises in characteristic
+// values iOS caches: change it with them. hap bumps the configuration
+// number (c#), which makes iOS read the accessories again, only when their
+// structure changes, values aside.
+const staticConfig = "audio=aaceld16k"
+
+// bumpOnStaticChange forgets hap's config hash when staticConfig changed:
+// hap then bumps c#.
+func bumpOnStaticChange(st hap.Store, logger *slog.Logger) {
+	if b, err := st.Get("openqiaraStatic"); err == nil && string(b) == staticConfig {
+		return
+	}
+	_ = st.Delete("configHash")
+	if err := st.Set("openqiaraStatic", []byte(staticConfig)); err != nil {
+		logger.Warn("homekit: static config marker not saved", "error", err)
+	}
+	logger.Info("homekit: advertised config changed, bumping c#", "config", staticConfig)
 }

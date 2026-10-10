@@ -80,7 +80,7 @@ func TestReadMulticastVideo(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	samples := readMulticastVideo(ctx, conn, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	samples := readMulticast(ctx, conn, "video", slog.New(slog.NewTextHandler(io.Discard, nil)), emitNALs)
 
 	tx, err := net.Dial("udp4", conn.LocalAddr().String())
 	if err != nil {

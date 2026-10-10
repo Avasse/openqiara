@@ -72,7 +72,8 @@ mount -o remount,ro /
 ```bash
 # Sur le Mac : cross-compiler
 cd openqiara
-GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" -o bin/openqiarad ./cmd/openqiarad
+CGO_ENABLED=1 CC="zig cc -target arm-linux-gnueabihf.2.30" \
+  GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" -o bin/openqiarad ./cmd/openqiarad  # sans zig : pas de son
 gzip -kf bin/openqiarad
 
 # Uploader (pas de SCP — utiliser cat pipe)

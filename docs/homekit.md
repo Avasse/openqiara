@@ -21,7 +21,7 @@
 | Alarme | SecuritySystem | CurrentState/TargetState — limité via `ValidVals` à 3 modes : `AwayArm`, `NightArm`, `Disarmed`. `AlarmTriggered` apparaît automatiquement quand l'engine passe en `triggered`. Exposé en mode standalone même sans KPD pairé. |
 | SRN | Switch | On (bool) — pas de type Siren natif dans HomeKit |
 | Shutter | Switch | On (bool) |
-| Caméra | IPCamera (H.264 / SRTP) | Flux live via pipeline HLS → MPEG-TS → H.264 RTP → SRTP (pure-Go, sans ffmpeg). Audio silencieux (transcodage AAC CGo à venir) |
+| Caméra | IPCamera (H.264 / SRTP) | Flux live 1080p et son du micro (AAC-ELD), sans ffmpeg (voir plus bas) |
 
 ## Architecture
 
@@ -48,7 +48,6 @@ HA découvre aussi le bridge via l'intégration HomeKit Controller (mDNS/Bonjour
 
 ## Limitations
 
-- **Audio caméra silencieux** : HomeKit impose AAC-ELD. Le transcodage est en cours (CGo libfdk-aac via zigcc).
 - **Pas de HomeKit Secure Video (HKSV)** : enregistrement cloud non implémenté.
 - **Pas de type Siren** : HomeKit n'a pas de service Siren natif. La SRN est exposée comme un Switch.
 - **Persistance** : le store HomeKit est dans `/data/homekit/`. Si le répertoire est supprimé, il faut re-appairer.
@@ -66,6 +65,8 @@ hlcamd → multicast 224.0.0.1:9600 (loopback, H.264 1080p) → réassemblage �
 ```
 hls (H.264) → /stream/*.ts → HLS watcher → MPEG-TS parser → H.264 RTP → SRTP → iOS
 ```
+
+Le son suit le même chemin : `hlcamd` envoie le micro en PCM brut (16 kHz mono) sur `224.0.0.1:9700`. openqiarad l'encode en AAC-ELD avec la libfdk-aac de la caméra (celle de `hls`, chargée par `dlopen`), une trame de 30 ms par paquet RTP (RFC 3640). iOS impose l'AAC-ELD : il refuse l'Opus même quand c'est le seul codec annoncé. Sans libfdk-aac, ou en mode `hls`, le flux reste muet.
 
 La vue web lit toujours les segments HLS. Le process `hls` stock est relancé avec `--use-h264` au boot (cf [`../scripts/camera_boot.sh`](../scripts/camera_boot.sh)).
 

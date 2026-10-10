@@ -15,8 +15,12 @@ all: build
 
 build: daemon flash
 
+# CGo for the AAC-ELD encoder (internal/aaceld): zig cross-compiles
+# against the camera's glibc 2.30 (brew install zig).
+CC_CAM = zig cc -target arm-linux-gnueabihf.2.30
+
 daemon:
-	GOOS=$(GOOS_CAM) GOARCH=$(GOARCH_CAM) GOARM=$(GOARM_CAM) \
+	CGO_ENABLED=1 CC="$(CC_CAM)" GOOS=$(GOOS_CAM) GOARCH=$(GOARCH_CAM) GOARM=$(GOARM_CAM) \
 		go build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BINARY_DAEMON) ./cmd/openqiarad
 	@# Compress with UPX if available — the camera's /data partition is ~20MB
 	@# so a 9.6MB binary leaves little headroom for logs and upgrades.

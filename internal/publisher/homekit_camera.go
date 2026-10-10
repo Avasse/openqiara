@@ -161,7 +161,12 @@ func (c *HomeKitCamera) publishStaticConfigs() {
 		c.log.Error("camera: marshal video config", "error", err)
 	}
 
-	if b, err := tlv8.Marshal(rtp.DefaultAudioStreamConfiguration()); err == nil {
+	// AAC-ELD 16 kHz only, the microphone's rate (SendPCM): iOS picks
+	// AAC-ELD even when offered nothing else (2026-10-10).
+	audioCfg := rtp.AudioStreamConfiguration{Codecs: []rtp.AudioCodecConfiguration{
+		rtp.NewAacEldAudioCodecConfiguration(),
+	}}
+	if b, err := tlv8.Marshal(audioCfg); err == nil {
 		c.acc.StreamManagement1.SupportedAudioStreamConfiguration.SetValue(b)
 	} else {
 		c.log.Error("camera: marshal audio config", "error", err)
@@ -303,7 +308,13 @@ func (c *HomeKitCamera) onSelectedRTPStreamConfiguration(buf []byte) {
 			"width", req.Video.Attributes.Width,
 			"height", req.Video.Attributes.Height,
 			"fps", req.Video.Attributes.Framerate,
-			"video_payload_type", req.Video.RTP.PayloadType)
+			"video_payload_type", req.Video.RTP.PayloadType,
+			"audio_codec", req.Audio.CodecType,
+			"audio_rate", req.Audio.CodecParams.Samplerate,
+			"audio_kbps", req.Audio.RTP.Bitrate)
+		if req.Audio.CodecType != rtp.AudioCodecType_AAC_ELD {
+			c.log.Warn("camera: iOS chose an audio codec we don't send, no sound", "codec", req.Audio.CodecType)
+		}
 		if err := c.startStreaming(sess, req.Video.RTP.PayloadType, req.Audio.RTP.PayloadType); err != nil {
 			c.log.Error("camera: failed to start streaming", "error", err)
 		}
@@ -418,8 +429,7 @@ func (c *HomeKitCamera) startStreaming(sess *cameraSession, videoPT, audioPT uin
 	sess.streaming = true
 
 	// Audio silence pump — iOS rejects camera sessions without an
-	// audio stream, so we ship Opus silence to keep the session alive
-	// until we can wire a real encoder.
+	// audio stream: silence fills in while no PCM comes.
 	sess.wg.Add(1)
 	go func() {
 		defer sess.wg.Done()
@@ -521,11 +531,13 @@ func (c *HomeKitCamera) startStreaming(sess *cameraSession, videoPT, audioPT uin
 					return
 				}
 				if !sample.IsVideo {
-					// Real audio support is on hold (see commit log).
-					// hlcamd produces AAC-LC, HomeKit wants AAC-ELD or
-					// Opus, and we have no pure-Go encoder. The audio
-					// silence pump (see RunSilence goroutine) keeps
-					// the iOS session alive without real sound.
+					// The hub's audio is PCM; the private parser's is
+					// AAC, left to the silence pump.
+					if c.hub != nil {
+						if err := audioSender.SendPCM(sample.Data); err != nil {
+							c.log.Debug("srtp audio: send failed", "error", err)
+						}
+					}
 					continue
 				}
 				if havePending {

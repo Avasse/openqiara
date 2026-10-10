@@ -61,7 +61,7 @@ de `/data/openqiarad.log`. Les PR sont les bienvenues.
 | Auto-discovery MQTT pour HA | ✅ |
 | Bridge HomeKit (capteurs + alarme) | ✅ |
 | **Vidéo live caméra HomeKit** | ✅ (SRTP pure-Go natif, sans ffmpeg) |
-| Audio caméra HomeKit | ⚠️ silencieux (transcodeur CGo libfdk-aac à venir) |
+| Audio caméra HomeKit | ✅ AAC-ELD (libfdk-aac de la caméra) |
 | Web UI pour appairage & config | ✅ |
 | Batterie | ⚠️ niveau réel pour la sirène seulement |
 | Température | ❌ |
@@ -92,9 +92,6 @@ mort — pas des bugs à corriger en bidouillant `openqiarad`.
   SRN peut le laisser `reachable=1` mais muet, ou complètement injoignable.
   Récupération : remise sous tension physique complète. Voir
   [`docs/sensors.md`](docs/sensors.md).
-
-- **Audio caméra HomeKit.** La vidéo marche, l'audio est silencieux. HomeKit
-  exige de l'AAC-ELD ; le pipeline pure-Go ne le transcode pas encore.
 
 - **Sécurité — état alpha.** Le mot de passe admin du Web UI est stocké
   en clair dans `/data/openqiara.json` et la comparaison HTTP Basic Auth
@@ -251,6 +248,9 @@ git clone https://github.com/Caligone/openqiara
 cd openqiara
 
 # Cross-compile le daemon pour la caméra (ARMv7)
+# zig (brew install zig) compile l'encodeur audio AAC-ELD contre la glibc
+# de la caméra. Sans zig ni CGO_ENABLED=1 : même binaire, sans le son.
+CGO_ENABLED=1 CC="zig cc -target arm-linux-gnueabihf.2.30" \
 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" \
     -o bin/openqiarad ./cmd/openqiarad
 

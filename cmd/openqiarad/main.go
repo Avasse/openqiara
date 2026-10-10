@@ -234,7 +234,7 @@ func main() {
 	if cfg.HomeKit.Camera.Source == "hls" {
 		mediaHub = mediahub.New(hlsPath, mediahub.HLS(hlsPath, logger), hlcamdResumer, logger)
 	} else {
-		mediaHub = mediahub.New("multicast 1080p", mediahub.Multicast(camera.MulticastVideoMain, logger), hlcamdResumer, logger)
+		mediaHub = mediahub.New("multicast 1080p + audio", mediahub.Multicast(camera.MulticastVideoMain, camera.MulticastAudio, logger), hlcamdResumer, logger)
 	}
 
 	// The video pipeline follows the privacy shutter (#50): paused while

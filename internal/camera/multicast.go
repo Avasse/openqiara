@@ -19,6 +19,7 @@ import (
 const (
 	MulticastGroup     = "224.0.0.1"
 	MulticastVideoMain = 9600
+	MulticastAudio     = 9700
 )
 
 // multicastHeader is the 24-byte header before each fragment (packed,
@@ -86,6 +87,29 @@ func (a *frameAssembler) add(f multicastFragment) ([]byte, bool) {
 // frame is Annex-B, SPS and PPS before each IDR); the PTS is hlcamd's, in
 // the 90 kHz clock.
 func MulticastVideo(ctx context.Context, port int, logger *slog.Logger) (<-chan Sample, error) {
+	return listenMulticast(ctx, port, "video", logger, emitNALs)
+}
+
+func emitNALs(frame []byte, pts int64, out func(Sample) bool) {
+	for _, nal := range splitNALUnits(frame) {
+		if len(nal) > 0 && !out(Sample{IsVideo: true, PTS: pts, Data: nal}) {
+			return
+		}
+	}
+}
+
+// MulticastPCM reads hlcamd's microphone on port until ctx ends: one Sample
+// per packet of raw PCM (s16le, 16 kHz, mono, 1024 samples).
+func MulticastPCM(ctx context.Context, port int, logger *slog.Logger) (<-chan Sample, error) {
+	return listenMulticast(ctx, port, "audio", logger, func(frame []byte, pts int64, out func(Sample) bool) {
+		out(Sample{PTS: pts, Data: frame})
+	})
+}
+
+// emitFunc turns a whole frame into Samples; out returns false once ctx ends.
+type emitFunc func(frame []byte, pts int64, out func(Sample) bool)
+
+func listenMulticast(ctx context.Context, port int, kind string, logger *slog.Logger, emit emitFunc) (<-chan Sample, error) {
 	ifi, err := net.InterfaceByName("lo")
 	if err != nil {
 		return nil, err
@@ -95,11 +119,19 @@ func MulticastVideo(ctx context.Context, port int, logger *slog.Logger) (<-chan 
 		return nil, fmt.Errorf("multicast %d: %w", port, err)
 	}
 	_ = conn.SetReadBuffer(1 << 20) // frames come in bursts of up to 24 KiB fragments
-	return readMulticastVideo(ctx, conn, logger), nil
+	return readMulticast(ctx, conn, kind, logger, emit), nil
 }
 
-func readMulticastVideo(ctx context.Context, conn net.PacketConn, logger *slog.Logger) <-chan Sample {
+func readMulticast(ctx context.Context, conn net.PacketConn, kind string, logger *slog.Logger, emit emitFunc) <-chan Sample {
 	out := make(chan Sample, 32)
+	send := func(s Sample) bool {
+		select {
+		case out <- s:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
 	go func() {
 		<-ctx.Done()
 		_ = conn.Close()
@@ -112,29 +144,17 @@ func readMulticastVideo(ctx context.Context, conn net.PacketConn, logger *slog.L
 			n, _, err := conn.ReadFrom(buf)
 			if err != nil {
 				if ctx.Err() == nil {
-					logger.Warn("multicast video: read failed", "error", err)
+					logger.Warn("multicast: read failed", "stream", kind, "error", err)
 				}
 				return
 			}
 			f, err := parseMulticastFragment(buf[:n])
 			if err != nil {
-				logger.Debug("multicast video: bad fragment", "error", err)
+				logger.Debug("multicast: bad fragment", "stream", kind, "error", err)
 				continue
 			}
-			frame, ok := asm.add(f)
-			if !ok {
-				continue
-			}
-			pts := int64(asm.ts * 90 / 1000)
-			for _, nal := range splitNALUnits(frame) {
-				if len(nal) == 0 {
-					continue
-				}
-				select {
-				case out <- Sample{IsVideo: true, PTS: pts, Data: nal}:
-				case <-ctx.Done():
-					return
-				}
+			if frame, ok := asm.add(f); ok {
+				emit(frame, int64(asm.ts*90/1000), send)
 			}
 		}
 	}()

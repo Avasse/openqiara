@@ -75,12 +75,16 @@ Clone le repo et cross-compile pour ARM :
 ```bash
 git clone https://github.com/Caligone/openqiara
 cd openqiara
+# zig (brew install zig) compile l'encodeur audio AAC-ELD contre la glibc
+# de la caméra. Sans zig ni CGO_ENABLED=1 : même binaire, sans le son.
+CGO_ENABLED=1 CC="zig cc -target arm-linux-gnueabihf.2.30" \
 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" \
     -o bin/openqiarad ./cmd/openqiarad
 ```
 
-Ça produit un binaire unique lié statiquement à `bin/openqiarad` (~10 MB).
-Pas besoin de runtime Go sur la caméra.
+Ça produit un binaire unique à `bin/openqiarad` (~10 MB), lié à la libc de
+la caméra ; libfdk-aac est chargée au démarrage d'un flux. Pas besoin de
+runtime Go sur la caméra.
 
 ---
 

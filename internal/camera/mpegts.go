@@ -27,12 +27,12 @@ const (
 	tsSyncByte   = 0x47
 )
 
-// Sample is one decoded media sample emitted by the parser.
-// For video: a single H.264 NAL unit (without the Annex B start code).
-// For audio: a single AAC frame (still framed in ADTS).
+// Sample is one media sample. Video: a single H.264 NAL unit, without the
+// Annex B start code. Audio: one AAC frame in ADTS from MPEGTSParser, raw
+// PCM (s16le, 16 kHz, mono) from MulticastPCM; mediahub hands out PCM only.
 type Sample struct {
 	IsVideo bool
-	PTS     int64 // 90 kHz clock for video, 90 kHz also for audio in MPEG-TS
+	PTS     int64 // 90 kHz clock
 	Data    []byte
 }
 

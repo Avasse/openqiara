@@ -41,19 +41,54 @@ type Resumer interface {
 // ends or the source fails.
 type Source func(ctx context.Context) (<-chan camera.Sample, error)
 
-// HLS reads the HLS playlist at path, as hls segments it.
+// HLS reads the HLS playlist at path, as hls segments it: video only, its
+// AAC is dropped (the hub's audio is PCM).
 func HLS(path string, logger *slog.Logger) Source {
 	return func(ctx context.Context) (<-chan camera.Sample, error) {
 		return hlsSamples(ctx, path, logger), nil
 	}
 }
 
-// Multicast reads hlcamd's H.264 stream on the loopback (1080p on
-// camera.MulticastVideoMain), which hls itself reads.
-func Multicast(port int, logger *slog.Logger) Source {
+// Multicast reads what hlcamd sends hls on the loopback: the H.264 stream
+// on videoPort (1080p on camera.MulticastVideoMain) and the microphone's
+// PCM on audioPort.
+func Multicast(videoPort, audioPort int, logger *slog.Logger) Source {
 	return func(ctx context.Context) (<-chan camera.Sample, error) {
-		return camera.MulticastVideo(ctx, port, logger)
+		video, err := camera.MulticastVideo(ctx, videoPort, logger)
+		if err != nil {
+			return nil, err
+		}
+		audio, err := camera.MulticastPCM(ctx, audioPort, logger)
+		if err != nil {
+			logger.Warn("mediahub: no audio", "error", err)
+			return video, nil
+		}
+		return merge(ctx, video, audio), nil
 	}
+}
+
+// merge forwards both channels' samples until both close.
+func merge(ctx context.Context, a, b <-chan camera.Sample) <-chan camera.Sample {
+	out := make(chan camera.Sample)
+	var wg sync.WaitGroup
+	for _, in := range []<-chan camera.Sample{a, b} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for s := range in {
+				select {
+				case out <- s:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
 
 // Hub multiplexes one camera pipeline to many subscribers.
@@ -181,7 +216,7 @@ func (h *Hub) runPipeline(ctx context.Context) {
 }
 
 // hlsSamples drives HLSWatcher → MPEGTSParser, flushing after each chunk,
-// which trims ~1s of latency.
+// which trims ~1s of latency, and keeps the video.
 func hlsSamples(ctx context.Context, path string, logger *slog.Logger) <-chan camera.Sample {
 	watcher := camera.NewHLSWatcher(path, logger)
 	parser := camera.NewMPEGTSParser(logger)
@@ -215,5 +250,19 @@ func hlsSamples(ctx context.Context, path string, logger *slog.Logger) <-chan ca
 			}
 		}
 	}()
-	return parser.Samples()
+	video := make(chan camera.Sample)
+	go func() {
+		defer close(video)
+		for s := range parser.Samples() {
+			if !s.IsVideo {
+				continue
+			}
+			select {
+			case video <- s:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return video
 }

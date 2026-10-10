@@ -2,21 +2,16 @@
 //
 // HomeKit cameras require both a video AND an audio RTP stream in the
 // session — iOS rejects sessions that only deliver video. This sender
-// supports two modes:
-//
-//  1. SendAACFrame: ship real AAC-LC frames extracted from the hlcamd
-//     MPEG-TS, packetized per RFC 3640 (mpeg4-generic). HomeKit
-//     officially expects AAC-ELD but the iOS AudioToolbox decoder is
-//     multi-profile and may accept AAC-LC.
-//
-//  2. RunSilence: pump hard-coded Opus silence frames at 50 fps,
-//     useful as a fallback when no real audio source is available
-//     (which is what we did before SendAACFrame existed).
+// encodes the microphone's PCM to AAC-ELD (SendPCM) and fills the gaps
+// with silence (RunSilence): no PCM with the HLS source, or hlcamd
+// stalled. Without libfdk-aac, it sends the Opus silence that kept the
+// session up before: no sound, but video.
 
 package publisher
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"net"
@@ -25,11 +20,24 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/srtp/v3"
+
+	"github.com/caligone/openqiara/internal/aaceld"
+)
+
+// The microphone's PCM (camera.MulticastPCM) is encoded as it comes:
+// AAC-ELD 16 kHz mono, which the accessory advertises, one 30 ms access
+// unit per packet, RFC 3640 (aac_rtp.go). The RTP clock is the sample rate.
+const (
+	aacSampleRate = 16000
+	aacBitrate    = 24000
+	// realAudioHold is how long after the last real packet silence stays
+	// off: PCM comes in 64 ms bursts.
+	realAudioHold = 200 * time.Millisecond
 )
 
 // makeAudioRTPHeader builds an RTP header for one Opus audio packet.
 // Marker bit is always set on audio packets in HomeKit (each packet is
-// a complete frame, no fragmentation needed for 20 ms Opus at 24 kHz).
+// a complete frame, no fragmentation needed).
 func makeAudioRTPHeader(pt uint8, seq uint16, ts, ssrc uint32) *rtp.Header {
 	return &rtp.Header{
 		Version:        2,
@@ -47,28 +55,31 @@ func makeAudioRTPHeader(pt uint8, seq uint16, ts, ssrc uint32) *rtp.Header {
 const audioDefaultPayloadType = 110
 
 // opusSilencePacket is a single Opus packet representing 20 ms of
-// silence at 24 kHz mono. The TOC byte 0xF8 = config 31 (CELT, 24 kHz,
-// 20 ms) + s=0 (mono) + c=0 (1 frame). The frame data is empty for
-// pure silence — Opus represents silence as the TOC byte alone.
+// silence, sent when no AAC-ELD encoder is at hand. The TOC byte 0xF8 = config 31 (CELT fullband, 20 ms) + s=0
+// (mono) + c=0 (1 frame). The frame data is empty for pure silence —
+// Opus represents silence as the TOC byte alone.
 var opusSilencePacket = []byte{0xF8}
 
-// srtpAudioSender encrypts hard-coded Opus silence frames into SRTP and
-// sends them to the iOS controller's audio RTP port at 50 fps.
+// srtpAudioSender encrypts audio packets into SRTP and sends them to the
+// iOS controller's audio RTP port.
 type srtpAudioSender struct {
 	logger *slog.Logger
 
-	conn      net.Conn // UDP socket connected to iOS:audioRtpPort
-	session   *srtp.SessionSRTP
-	writer    *srtp.WriteStreamSRTP
+	conn    net.Conn // UDP socket connected to iOS:audioRtpPort
+	session *srtp.SessionSRTP
+	writer  *srtp.WriteStreamSRTP
 
 	ssrc        uint32
 	payloadType uint8
 
-	// Sequence number / timestamp for synthetic Opus packets.
-	mu     sync.Mutex
-	seq    uint16
-	tsBase uint32 // initial timestamp (random per RFC 3550)
-	closed bool
+	mu       sync.Mutex
+	seq      uint16
+	ts       uint32          // next packet's RTP timestamp (random start per RFC 3550)
+	enc      *aaceld.Encoder // nil without libfdk-aac
+	pcm      []int16         // PCM waiting for a whole frame
+	silence  []int16
+	lastReal time.Time // last packet of real audio
+	closed   bool
 }
 
 // newSRTPAudioSender opens a UDP socket to the iOS controller and
@@ -118,6 +129,12 @@ func newSRTPAudioSender(
 		return nil, fmt.Errorf("srtp audio: new session: %w", err)
 	}
 
+	enc, err := aaceld.New(aacSampleRate, aacBitrate)
+	if err != nil {
+		logger.Warn("srtp audio: no AAC-ELD encoder, no sound", "error", err)
+		enc = nil
+	}
+
 	writer, err := session.OpenWriteStream()
 	if err != nil {
 		_ = session.Close()
@@ -138,23 +155,59 @@ func newSRTPAudioSender(
 		ssrc:        ssrc,
 		payloadType: payloadType,
 		seq:         uint16(time.Now().UnixNano() & 0xFFFF),
-		tsBase:      uint32(time.Now().UnixNano() & 0xFFFFFFFF),
+		ts:          uint32(time.Now().UnixNano() & 0xFFFFFFFF),
+		enc:         enc,
+		silence:     make([]int16, aaceld.FrameSamples),
 	}, nil
 }
 
-// RunSilence streams Opus silence packets to the iOS audio port at 50
-// fps (one packet every 20 ms) until ctx is cancelled. Each packet
-// advances the RTP timestamp by 480 samples (20 ms at 24 kHz). Used
-// as a fallback when no real audio source is wired in.
+// sendFrameLocked encodes one frame and sends it as the next packet. The
+// clock moves on even when the encoder, filling up, returns nothing.
+func (s *srtpAudioSender) sendFrameLocked(pcm []int16) error {
+	au, err := s.enc.Encode(pcm)
+	ts := s.ts
+	s.ts += aaceld.FrameSamples
+	if err != nil || len(au) == 0 {
+		return err
+	}
+	pkt := packetizeAAC(au, s.ssrc, s.seq, ts, s.payloadType)
+	s.seq++
+	_, err = s.writer.WriteRTP(&pkt.Header, pkt.Payload)
+	return err
+}
+
+// SendPCM encodes the microphone's PCM (s16le, 16 kHz, mono) and sends it
+// a frame at a time; what is left waits for the next call.
+func (s *srtpAudioSender) SendPCM(data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.enc == nil {
+		return nil
+	}
+	for i := 0; i+1 < len(data); i += 2 {
+		s.pcm = append(s.pcm, int16(binary.LittleEndian.Uint16(data[i:])))
+	}
+	for len(s.pcm) >= aaceld.FrameSamples {
+		err := s.sendFrameLocked(s.pcm[:aaceld.FrameSamples])
+		s.pcm = s.pcm[aaceld.FrameSamples:]
+		if err != nil {
+			return err
+		}
+		s.lastReal = time.Now()
+	}
+	s.pcm = append(s.pcm[:0:0], s.pcm...) // don't grow the backing array forever
+	return nil
+}
+
+// RunSilence sends silence, a frame at a time, while no real audio comes,
+// until ctx is cancelled: iOS drops a session without audio.
 func (s *srtpAudioSender) RunSilence(ctx context.Context) {
-	const frameDuration = 20 * time.Millisecond
-	const samplesPerFrame = 480 // 24 kHz * 20 ms
-
-	ticker := time.NewTicker(frameDuration)
+	every := time.Duration(aaceld.FrameSamples) * time.Second / aacSampleRate
+	if s.enc == nil {
+		every = 20 * time.Millisecond
+	}
+	ticker := time.NewTicker(every)
 	defer ticker.Stop()
-
-	tsOffset := uint32(0)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -165,58 +218,24 @@ func (s *srtpAudioSender) RunSilence(ctx context.Context) {
 				s.mu.Unlock()
 				return
 			}
-			seq := s.seq
-			s.seq++
+			var err error
+			switch {
+			case time.Since(s.lastReal) <= realAudioHold:
+			case s.enc != nil:
+				err = s.sendFrameLocked(s.silence)
+			default:
+				header := makeAudioRTPHeader(s.payloadType, s.seq, s.ts, s.ssrc)
+				s.seq++
+				s.ts += 960 // 20 ms at Opus's 48 kHz RTP clock
+				_, err = s.writer.WriteRTP(header, opusSilencePacket)
+			}
 			s.mu.Unlock()
-
-			ts := s.tsBase + tsOffset
-			tsOffset += samplesPerFrame
-
-			header := makeAudioRTPHeader(s.payloadType, seq, ts, s.ssrc)
-			if _, err := s.writer.WriteRTP(header, opusSilencePacket); err != nil {
+			if err != nil {
 				s.logger.Debug("srtp audio: write failed", "error", err)
 				return
 			}
 		}
 	}
-}
-
-// SendAACFrame packetizes one raw AAC frame per RFC 3640 mpeg4-generic
-// and sends it to iOS over SRTP. pts90khz is the source MPEG-TS PTS in
-// 90 kHz units; we map it to a monotonic 16 kHz timestamp (the AAC
-// sample rate).
-//
-// CURRENTLY UNUSED. iOS rejects raw AAC-LC silently (see aac_rtp.go
-// header comment). Kept around for the future CGo libfdk-aac path
-// that will produce real AAC-ELD frames; this packetization layer is
-// reusable as long as the input is the right AAC profile.
-func (s *srtpAudioSender) SendAACFrame(aacRaw []byte, pts90khz int64) error {
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-		return nil
-	}
-	seq := s.seq
-	s.seq++
-	s.mu.Unlock()
-
-	// Map 90 kHz PTS to 16 kHz audio clock (the AAC sample rate from
-	// hlcamd). RTP timestamp scaling = ts90 * audio_rate / 90000.
-	var ts uint32
-	if pts90khz >= 0 {
-		ts = s.tsBase + uint32(pts90khz*16000/90000)
-	} else {
-		ts = s.tsBase
-	}
-
-	pkt := packetizeAAC(aacRaw, s.ssrc, seq, ts, s.payloadType)
-	if pkt == nil {
-		return nil
-	}
-	if _, err := s.writer.WriteRTP(&pkt.Header, pkt.Payload); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Close shuts down the SRTP session and closes the UDP socket.
@@ -227,6 +246,9 @@ func (s *srtpAudioSender) Close() error {
 		return nil
 	}
 	s.closed = true
+	if s.enc != nil {
+		s.enc.Close()
+	}
 	if s.session != nil {
 		_ = s.session.Close()
 	}
