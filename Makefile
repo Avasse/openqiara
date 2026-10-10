@@ -1,5 +1,4 @@
 BINARY_DAEMON = bin/openqiarad
-BINARY_FLASH  = bin/openqiara-flash
 
 GOFLAGS = -trimpath
 LDFLAGS = -s -w
@@ -9,11 +8,11 @@ GOOS_CAM   = linux
 GOARCH_CAM = arm
 GOARM_CAM  = 7
 
-.PHONY: all build daemon flash test lint clean
+.PHONY: all build daemon test lint clean
 
 all: build
 
-build: daemon flash
+build: daemon
 
 # CGo for the AAC-ELD encoder (internal/aaceld): zig cross-compiles
 # against the camera's glibc 2.30 (brew install zig).
@@ -30,10 +29,6 @@ daemon:
 	else \
 		echo "WARNING: upx not found — binary will be ~10MB (install: brew install upx)"; \
 	fi
-
-# flash: placeholder — not implemented yet, use scripts/sd_setup.sh
-flash:
-	@echo "openqiara-flash is not implemented yet. Use scripts/sd_setup.sh instead." && exit 2
 
 test:
 	go test -race -count=1 ./...

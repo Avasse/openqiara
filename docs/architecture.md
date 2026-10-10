@@ -98,7 +98,6 @@ OpenQiara ne remplace **pas** le système init, `hlconnman`, ni `nginx`.
 openqiara/
 ├── cmd/
 │   ├── openqiarad/         # Daemon principal (tourne sur la caméra)
-│   ├── openqiara-flash/    # Outil de flash SD (poste de dev)
 │   ├── mcu-info/           # Lecteur d'info MCU (debug)
 │   ├── charmux-test/       # Client charmux debug (debug)
 │   ├── decode-frame/       # Décodeur de managed frame (debug)
