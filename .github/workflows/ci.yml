@@ -36,8 +36,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
+      # Same cgo build as the release (AAC-ELD encoder, internal/aaceld).
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
       - name: Build daemon (ARM)
-        run: GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -o bin/openqiarad ./cmd/openqiarad
+        run: |
+          CGO_ENABLED=1 CC="zig cc -target arm-linux-gnueabihf.2.30" \
+          GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -o bin/openqiarad ./cmd/openqiarad
+          file bin/openqiarad
       - uses: actions/upload-artifact@v4
         with:
           name: binaries
