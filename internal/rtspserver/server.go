@@ -6,7 +6,6 @@ package rtspserver
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -393,14 +392,12 @@ func auHasParams(au [][]byte) bool {
 
 // audioEncoder turns the hub's PCM into AAC-LC RTP packets.
 type audioEncoder struct {
-	aac      *aacenc.Encoder
-	rtp      *rtpmpeg4audio.Encoder
-	pcm      []int16
-	framePTS int64 // 90 kHz PTS of pcm[0]
+	aac *aacenc.Stream
+	rtp *rtpmpeg4audio.Encoder
 }
 
 func newAudioEncoder(f *format.MPEG4Audio) (*audioEncoder, error) {
-	aac, err := aacenc.New(aacenc.LC, audioRate, audioBitrate)
+	aac, err := aacenc.NewStream(aacenc.LC, audioRate, audioBitrate)
 	if err != nil {
 		return nil, err
 	}
@@ -417,29 +414,11 @@ func newAudioEncoder(f *format.MPEG4Audio) (*audioEncoder, error) {
 
 func (a *audioEncoder) close() { a.aac.Close() }
 
-// writeAudio encodes the PCM a frame at a time and writes it to the
-// readers. A frame's RTP timestamp comes from the PTS of its first sample,
-// on the same hlcamd clock as the video.
+// writeAudio encodes the PCM and writes it to the readers. An access
+// unit's RTP timestamp comes from the PTS of its first sample, on the same
+// hlcamd clock as the video.
 func (s *Server) writeAudio(a *audioEncoder, sample camera.Sample) {
-	if len(a.pcm) == 0 {
-		a.framePTS = sample.PTS
-	}
-	for i := 0; i+1 < len(sample.Data); i += 2 {
-		a.pcm = append(a.pcm, int16(binary.LittleEndian.Uint16(sample.Data[i:])))
-	}
-	frame := aacenc.LC.FrameSamples()
-	for len(a.pcm) >= frame {
-		au, err := a.aac.Encode(a.pcm[:frame])
-		a.pcm = a.pcm[frame:]
-		pts := a.framePTS
-		a.framePTS += int64(frame) * 90000 / audioRate
-		if err != nil {
-			s.log.Warn("rtsp: aac encode", "error", err)
-			return
-		}
-		if len(au) == 0 {
-			continue
-		}
+	err := a.aac.Write(sample.Data, sample.PTS, func(au []byte, pts int64) {
 		pkts, err := a.rtp.Encode([][]byte{au})
 		if err != nil {
 			s.log.Warn("rtsp: aac packetize", "error", err)
@@ -459,6 +438,8 @@ func (s *Server) writeAudio(a *audioEncoder, sample camera.Sample) {
 				return
 			}
 		}
+	})
+	if err != nil {
+		s.log.Warn("rtsp: aac encode", "error", err)
 	}
-	a.pcm = append(a.pcm[:0:0], a.pcm...)
 }

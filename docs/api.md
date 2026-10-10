@@ -276,9 +276,11 @@ data: {"state":"armed_away","armed_at":1789891779}
 GET /stream/{fichier}
 ```
 
-Sert les artefacts HLS produits par `hlcamd` depuis `/tmp/out_stream/stream/`.
-Extensions acceptées : `.m3u8`, `.m4s`, `.ts` — tout le reste est `404`.
-Les `.m4s` contiennent du MPEG-TS malgré l'extension.
+Sert le flux en HLS (MPEG-TS, 1080p + AAC-LC), muxé par openqiarad à la
+demande. `HLS_TEST.m3u8`, à la racine ou sous `720p/`, est la playlist
+principale. `503` si aucune image n'arrive en 10 s (clapet fermé). Avec la
+source `hls`, sert les fichiers du segmenteur du constructeur depuis
+`/tmp/out_stream/stream/`.
 
 Une requête sur la playlist déclenche un *lazy healing* si elle n'a pas été
 écrite depuis trop longtemps : la requête courante peut échouer, la suivante

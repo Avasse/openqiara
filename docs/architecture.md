@@ -79,7 +79,7 @@ dans l'init existant.
 - Modules kernel (WiFi `ssv6x5x`, capteurs caméra, etc.)
 - Firmware MCU (`hlcam02_ctrl.bin`) flashé à chaque boot par `uartboot`
 - Multiplexeur UART `charmux`
-- `hlcamd` + `hls` pour le pipeline vidéo
+- `hlcamd` pour l'encodage vidéo (le HLS est servi par openqiarad)
 - `nginx`
 - SSH `dropbear`
 

@@ -14,7 +14,11 @@ require (
 )
 
 require (
-	github.com/bluenviron/mediacommon/v2 v2.9.1 // indirect
+	github.com/abema/go-mp4 v1.7.3 // indirect
+	github.com/asticode/go-astikit v0.30.0 // indirect
+	github.com/asticode/go-astits v1.16.0 // indirect
+	github.com/bluenviron/gohlslib/v2 v2.4.6 // indirect
+	github.com/bluenviron/mediacommon/v2 v2.9.6 // indirect
 	github.com/brutella/dnssd v1.2.14 // indirect
 	github.com/go-chi/chi v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect

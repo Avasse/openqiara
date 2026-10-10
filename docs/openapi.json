@@ -1932,7 +1932,7 @@
         ],
         "summary": "Récupérer un segment vidéo",
         "operationId": "getHLSFile",
-        "description": "Sert les playlists et segments HLS produits par la caméra. Demander la playlist relance le pipeline s'il s'est arrêté : la requête courante peut échouer, la suivante aboutira.\n\nLes segments `.m4s` contiennent du MPEG-TS malgré l'extension.\n\n**Chemins imbriqués** : les variantes de qualité vivent dans un sous-dossier (`/stream/720p/HLS_TEST.m3u8`). Un paramètre de chemin OpenAPI ne traverse pas les `/` — construire ces URL en concaténant, sans encoder le séparateur, plutôt qu'en passant le chemin entier comme valeur de `file`.",
+        "description": "Sert le flux en HLS : playlists et segments MPEG-TS (H.264 1080p + AAC-LC), muxés par openqiarad à la demande. `HLS_TEST.m3u8` est la playlist principale ; la première requête attend le premier segment (1 à 2 s). Avec la source `hls`, sert les fichiers du segmenteur du constructeur.\n\n**Chemins imbriqués** : l'URL historique `/stream/720p/HLS_TEST.m3u8` sert le même flux. Un paramètre de chemin OpenAPI ne traverse pas les `/` — construire ces URL en concaténant, sans encoder le séparateur, plutôt qu'en passant le chemin entier comme valeur de `file`.",
         "parameters": [
           {
             "name": "file",
@@ -1965,6 +1965,16 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "503": {
+            "description": "Aucune image en 10 s (clapet fermé).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Fichier absent ou extension non servie.",
             "content": {
@@ -1985,7 +1995,7 @@
         ],
         "summary": "Récupérer un segment vidéo d'une variante",
         "operationId": "getHLSVariantFile",
-        "description": "Même chose que la route sans sous-dossier, pour les variantes de qualité produites par la caméra.",
+        "description": "Même chose que la route sans sous-dossier : toutes les variantes servent le même flux 1080p.",
         "parameters": [
           {
             "name": "variant",
@@ -2027,6 +2037,16 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "description": "Aucune image en 10 s (clapet fermé).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "404": {
             "description": "Fichier absent ou extension non servie.",

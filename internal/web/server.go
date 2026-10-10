@@ -104,6 +104,8 @@ type Server struct {
 	// playlist n'est pas écrite depuis >maxAge). nil = pas de healing,
 	// /api/stream/start fait un resume direct par exec.Command.
 	hlcamd *camera.HlcamdResumer
+	// hls serves /stream/ when set (internal/hlsserver), else hls's files.
+	hls http.Handler
 
 	// ota expose les endpoints /api/update/*. nil = endpoints renvoient
 	// 503 (pas configuré en build local sans -ldflags).
@@ -161,6 +163,12 @@ func (s *Server) SetHLEventsDispatcher(d *hlevents.Dispatcher) {
 // requêtes GET /stream/ ne tentent aucun resume.
 func (s *Server) SetHlcamdResumer(h *camera.HlcamdResumer) {
 	s.hlcamd = h
+}
+
+// SetHLS serves /stream/ from h (internal/hlsserver) instead of hls's
+// files.
+func (s *Server) SetHLS(h http.Handler) {
+	s.hls = h
 }
 
 // SetVersion sets the build version exposed in /api/status. Called from
@@ -1430,6 +1438,10 @@ func (s *Server) handleStartStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHLSStream(w http.ResponseWriter, r *http.Request) {
+	if s.hls != nil {
+		s.hls.ServeHTTP(w, r)
+		return
+	}
 	const streamRoot = "/tmp/out_stream/stream/"
 	// Whitelist d'extensions + interdiction des composants `..` / chemin
 	// absolu. Limite l'exposition même si Go nettoie déjà côté ServeFile :

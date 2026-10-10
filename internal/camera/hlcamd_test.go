@@ -10,7 +10,7 @@ import (
 // request (a stale or missing playlist) resumes nothing: the streams stay
 // paused (#50).
 func TestResumerShutterClosed(t *testing.T) {
-	r := NewHlcamdResumer(filepath.Join(t.TempDir(), "missing.m3u8"), 0, 0, nil)
+	r := NewHlcamdResumer(PlaylistMtime(filepath.Join(t.TempDir(), "missing.m3u8")), 0, 0, nil)
 	r.closed.Store(true)
 	if r.ResumeIfStale(context.Background()) {
 		t.Error("streams resumed with the shutter closed")

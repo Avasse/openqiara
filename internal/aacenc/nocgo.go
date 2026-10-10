@@ -8,7 +8,7 @@ import "errors"
 // streams without sound.
 
 // Encoder is never built without cgo.
-type Encoder struct{}
+type Encoder struct{ frame int }
 
 // New always fails without cgo.
 func New(p Profile, sampleRate, bitrate int) (*Encoder, error) {

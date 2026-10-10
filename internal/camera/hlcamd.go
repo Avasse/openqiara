@@ -11,18 +11,18 @@ import (
 	"time"
 )
 
-// HlcamdResumer wakes hlcamd up via fbxbus when its HLS pipeline stalls.
+// HlcamdResumer wakes hlcamd up via fbxbus when its stream stalls.
 //
-// hlcamd freeze silencieux après quelques heures : la playlist HLS n'est
-// plus mise à jour mais le process reste up. `fbxbusctl call hlcamd
-// resume_streams` débloque sans kill/restart. Plutôt qu'un watchdog
-// polling, on déclenche le check de manière lazy à chaque requête video
-// (handleHLSStream + HLSWatcher). En idle (personne ne regarde), aucun
-// travail.
+// hlcamd freeze silencieux après quelques heures : plus d'image mais le
+// process reste up. `fbxbusctl call hlcamd resume_streams` débloque sans
+// kill/restart. Plutôt qu'un watchdog polling, on déclenche le check de
+// manière lazy quand quelqu'un regarde (mediahub). En idle, aucun travail.
 type HlcamdResumer struct {
-	playlistPath string
-	maxAge       time.Duration
-	log          *slog.Logger
+	// lastFrame tells when the stream last moved: the media hub's last
+	// sample, or the HLS playlist's mtime. Zero: never.
+	lastFrame func() time.Time
+	maxAge    time.Duration
+	log       *slog.Logger
 
 	// Anti-thundering-herd : si plusieurs requêtes parallèles détectent
 	// le stale (cas burst HLS), on ne déclenche qu'un seul resume_streams.
@@ -36,45 +36,52 @@ type HlcamdResumer struct {
 	closed atomic.Bool
 }
 
-// NewHlcamdResumer returns a resumer for the given HLS playlist path.
+// NewHlcamdResumer returns a resumer judging the stream by lastFrame.
 // maxAge is the staleness threshold (e.g. 10*time.Second). cooldown
 // bounds the minimum interval between two resume calls (e.g. 5s) to
 // avoid flooding fbxbusctl in case the pipeline is in a degraded state.
-func NewHlcamdResumer(playlistPath string, maxAge, cooldown time.Duration, logger *slog.Logger) *HlcamdResumer {
+func NewHlcamdResumer(lastFrame func() time.Time, maxAge, cooldown time.Duration, logger *slog.Logger) *HlcamdResumer {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &HlcamdResumer{
-		playlistPath: playlistPath,
-		maxAge:       maxAge,
-		cooldown:     cooldown,
-		log:          logger,
+		lastFrame: lastFrame,
+		maxAge:    maxAge,
+		cooldown:  cooldown,
+		log:       logger,
 	}
 }
 
-// ResumeIfStale checks the playlist mtime and triggers resume_streams if
-// it hasn't moved within maxAge. Returns true if a resume was issued.
+// PlaylistMtime judges the stream by an HLS playlist, as hls writes it.
+func PlaylistMtime(path string) func() time.Time {
+	return func() time.Time {
+		info, err := os.Stat(path)
+		if err != nil {
+			return time.Time{}
+		}
+		return info.ModTime()
+	}
+}
+
+// ResumeIfStale triggers resume_streams if the stream hasn't moved within
+// maxAge. Returns true if a resume was issued.
 //
-// Best-effort : les erreurs (stat fail, fbxbusctl fail) sont loggées
-// mais ne sont jamais remontées. Le caller continue à servir la requête
-// HLS — si hlcamd ne revient pas, le client video verra un 404/timeout
+// Best-effort : les erreurs fbxbusctl sont loggées mais ne sont jamais
+// remontées. Si hlcamd ne revient pas, le client vidéo verra un timeout
 // par le chemin normal.
 func (r *HlcamdResumer) ResumeIfStale(ctx context.Context) bool {
 	if r.closed.Load() {
 		return false // paused on purpose: shutter closed
 	}
-	info, err := os.Stat(r.playlistPath)
-	if err != nil {
-		// Pas de playlist du tout = hlcamd n'a pas (encore) démarré
-		// son pipeline. resume_streams peut aider.
-		r.log.Debug("hls playlist missing — forcing resume", "path", r.playlistPath, "error", err)
-		return r.callResume(ctx, "missing playlist")
+	last := r.lastFrame()
+	if last.IsZero() {
+		return r.callResume(ctx, "no frame yet")
 	}
-	age := time.Since(info.ModTime())
+	age := time.Since(last)
 	if age < r.maxAge {
 		return false
 	}
-	return r.callResume(ctx, fmt.Sprintf("playlist stale (%.1fs > %.1fs)", age.Seconds(), r.maxAge.Seconds()))
+	return r.callResume(ctx, fmt.Sprintf("stream stale (%.1fs > %.1fs)", age.Seconds(), r.maxAge.Seconds()))
 }
 
 // ForceResume issues a resume regardless of staleness. Used by the

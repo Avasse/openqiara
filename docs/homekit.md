@@ -68,7 +68,7 @@ hls (H.264) → /stream/*.ts → HLS watcher → MPEG-TS parser → H.264 RTP �
 
 Le son suit le même chemin : `hlcamd` envoie le micro en PCM brut (16 kHz mono) sur `224.0.0.1:9700`. openqiarad l'encode en AAC-ELD avec la libfdk-aac de la caméra (celle de `hls`, chargée par `dlopen`), une trame de 30 ms par paquet RTP (RFC 3640). iOS impose l'AAC-ELD : il refuse l'Opus même quand c'est le seul codec annoncé. Sans libfdk-aac, ou en mode `hls`, le flux reste muet.
 
-La vue web lit toujours les segments HLS. Le process `hls` stock est relancé avec `--use-h264` au boot (cf [`../scripts/camera_boot.sh`](../scripts/camera_boot.sh)).
+La vue web lit le HLS qu'openqiarad mux lui-même à partir du même flux (voir [`video.md`](video.md)). `hlcamd` est relancé avec `--use-h264` au boot (cf [`../scripts/camera_boot.sh`](../scripts/camera_boot.sh)).
 
 ## Bibliothèque
 

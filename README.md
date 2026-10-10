@@ -290,7 +290,7 @@ Ce qui reste du constructeur :
 - `charmux` (multiplexeur UART vers le MCU)
 - `uartboot` (flashe le firmware MCU à chaque boot)
 - Le firmware MCU lui-même (`/lib/firmwares/hlcam02_ctrl.bin`)
-- Pipeline vidéo (`hlcamd`, `hls`)
+- Encodeur vidéo (`hlcamd`)
 
 Ce qu'OpenQiara remplace :
 

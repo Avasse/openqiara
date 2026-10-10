@@ -193,9 +193,14 @@ if [ -n "$EUPID" ] && [ -n "$MAC" ]; then
         >> /data/hlcamd.log 2>&1 &
 fi
 sleep 2
-# Restart HLS segmenter in H.264 mode (single 720p stream)
-mkdir -p /tmp/out_stream/stream/720p
-hls -p /tmp/out_stream/stream/720p -r 720 --use-h264 &
+# hls segmented hlcamd's stream into /tmp/out_stream for the web view.
+# openqiarad now serves that HLS itself (internal/hlsserver), from what
+# hlcamd multicasts: hls only runs for the fallback source "hls"
+# (homekit.camera.source in openqiara.json).
+if grep -q '"source": *"hls"' /data/openqiara.json 2>/dev/null; then
+    mkdir -p /tmp/out_stream/stream/720p
+    hls -p /tmp/out_stream/stream/720p -r 720 --use-h264 &
+fi
 
 # Apply a pending OTA binary swap. onComplete (openqiarad) stages the new
 # binary on /media and reboots, leaving /data/ota_pending with its path.

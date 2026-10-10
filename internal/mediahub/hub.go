@@ -19,6 +19,8 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/caligone/openqiara/internal/camera"
 )
@@ -97,6 +99,8 @@ type Hub struct {
 	source  Source
 	log     *slog.Logger
 	resumer Resumer
+
+	last atomic.Int64 // unix nanos of the last sample
 
 	mu     sync.Mutex
 	subs   map[*subscription]struct{}
@@ -177,9 +181,22 @@ func (h *Hub) unsubscribe(sub *subscription) {
 	}
 }
 
+// LastSample tells when the source last sent a sample; zero: never.
+func (h *Hub) LastSample() time.Time {
+	if n := h.last.Load(); n != 0 {
+		return time.Unix(0, n)
+	}
+	return time.Time{}
+}
+
+// staleCheck is how often a running pipeline asks the resumer whether the
+// stream stalled.
+const staleCheck = 5 * time.Second
+
 // broadcast delivers a sample to every subscriber, dropping it for any
 // subscriber whose buffer is full rather than blocking the parser.
 func (h *Hub) broadcast(sample camera.Sample) {
+	h.last.Store(time.Now().UnixNano())
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for sub := range h.subs {
@@ -202,10 +219,16 @@ func (h *Hub) runPipeline(ctx context.Context) {
 		h.log.Warn("mediahub: source failed", "source", h.name, "error", err)
 		return
 	}
+	check := time.NewTicker(staleCheck)
+	defer check.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-check.C:
+			if h.resumer != nil {
+				h.resumer.ResumeIfStale(ctx)
+			}
 		case sample, ok := <-samples:
 			if !ok {
 				return

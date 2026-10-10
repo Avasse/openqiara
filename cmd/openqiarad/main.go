@@ -17,6 +17,7 @@ import (
 	"github.com/caligone/openqiara/internal/charmux"
 	"github.com/caligone/openqiara/internal/config"
 	"github.com/caligone/openqiara/internal/hlevents"
+	"github.com/caligone/openqiara/internal/hlsserver"
 	"github.com/caligone/openqiara/internal/mdns"
 	"github.com/caligone/openqiara/internal/mediahub"
 	"github.com/caligone/openqiara/internal/mqtt"
@@ -222,19 +223,24 @@ func main() {
 	// heures (cf. feedback_hlcamd_freeze_after_hours.md) : le resumer le
 	// réveille à chaque requête vidéo. Le hub lit le flux H.264 une seule
 	// fois et le fan-out vers HomeKit (SRTP) et RTSP : par défaut le 1080p
-	// que hlcamd envoie en multicast local, ou les segments HLS. La vue web
-	// lit toujours les fichiers HLS.
+	// que hlcamd envoie en multicast local (et le micro), ou les segments
+	// de hls. En multicast, openqiarad sert aussi le HLS de la vue web
+	// (internal/hlsserver) : hls ne sert plus à rien.
 	// HLSPath par défaut si non configuré : voir homekit_camera.go.
 	hlsPath := cfg.HomeKit.Camera.HLSPath
 	if hlsPath == "" {
 		hlsPath = "/tmp/out_stream/stream/720p/HLS_TEST.m3u8"
 	}
-	hlcamdResumer := camera.NewHlcamdResumer(hlsPath, 10*time.Second, 5*time.Second, logger)
 	var mediaHub *mediahub.Hub
+	var hlcamdResumer *camera.HlcamdResumer
+	var hlsSrv *hlsserver.Server
 	if cfg.HomeKit.Camera.Source == "hls" {
+		hlcamdResumer = camera.NewHlcamdResumer(camera.PlaylistMtime(hlsPath), 10*time.Second, 5*time.Second, logger)
 		mediaHub = mediahub.New(hlsPath, mediahub.HLS(hlsPath, logger), hlcamdResumer, logger)
 	} else {
+		hlcamdResumer = camera.NewHlcamdResumer(func() time.Time { return mediaHub.LastSample() }, 10*time.Second, 5*time.Second, logger)
 		mediaHub = mediahub.New("multicast 1080p + audio", mediahub.Multicast(camera.MulticastVideoMain, camera.MulticastAudio, logger), hlcamdResumer, logger)
+		hlsSrv = hlsserver.New(mediaHub, true, logger)
 	}
 
 	// The video pipeline follows the privacy shutter (#50): paused while
@@ -429,6 +435,9 @@ func main() {
 	// qu'après Start (web UI, caméra HK).
 	if webSrv != nil {
 		webSrv.SetHlcamdResumer(hlcamdResumer)
+		if hlsSrv != nil {
+			webSrv.SetHLS(hlsSrv)
+		}
 	}
 	if hkPub != nil && hkPub.Camera() != nil {
 		hkPub.Camera().SetHlcamdResumer(hlcamdResumer)
