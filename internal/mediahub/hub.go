@@ -1,5 +1,6 @@
 // Package mediahub fans out the camera's H.264 sample stream to multiple
-// consumers (HomeKit SRTP, RTSP, …) from a single HLS→MPEG-TS pipeline.
+// consumers (HomeKit SRTP, RTSP, …) from a single source: hlcamd's 1080p
+// multicast stream, or the HLS→MPEG-TS pipeline.
 //
 // Without it, each output built its own HLSWatcher + MPEGTSParser, so N
 // active outputs meant N disk readers and N MPEG-TS decodes of the very
@@ -36,9 +37,29 @@ type Resumer interface {
 	ResumeIfStale(ctx context.Context) bool
 }
 
+// Source starts the camera's sample stream; the channel closes when ctx
+// ends or the source fails.
+type Source func(ctx context.Context) (<-chan camera.Sample, error)
+
+// HLS reads the HLS playlist at path, as hls segments it.
+func HLS(path string, logger *slog.Logger) Source {
+	return func(ctx context.Context) (<-chan camera.Sample, error) {
+		return hlsSamples(ctx, path, logger), nil
+	}
+}
+
+// Multicast reads hlcamd's H.264 stream on the loopback (1080p on
+// camera.MulticastVideoMain), which hls itself reads.
+func Multicast(port int, logger *slog.Logger) Source {
+	return func(ctx context.Context) (<-chan camera.Sample, error) {
+		return camera.MulticastVideo(ctx, port, logger)
+	}
+}
+
 // Hub multiplexes one camera pipeline to many subscribers.
 type Hub struct {
-	hlsPath string
+	name    string // for logs
+	source  Source
 	log     *slog.Logger
 	resumer Resumer
 
@@ -52,13 +73,15 @@ type subscription struct {
 	hub *Hub
 }
 
-// New returns an idle Hub. The pipeline starts on the first Subscribe.
-func New(hlsPath string, resumer Resumer, logger *slog.Logger) *Hub {
+// New returns an idle Hub. The pipeline starts on the first Subscribe;
+// name tells the source in logs.
+func New(name string, source Source, resumer Resumer, logger *slog.Logger) *Hub {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Hub{
-		hlsPath: hlsPath,
+		name:    name,
+		source:  source,
 		log:     logger,
 		resumer: resumer,
 		subs:    make(map[*subscription]struct{}),
@@ -93,7 +116,7 @@ func (h *Hub) Subscribe() Subscription {
 	h.mu.Unlock()
 
 	if first {
-		h.log.Info("mediahub: pipeline started", "hls", h.hlsPath)
+		h.log.Info("mediahub: pipeline started", "source", h.name)
 	}
 	return Subscription{s: sub}
 }
@@ -134,20 +157,38 @@ func (h *Hub) broadcast(sample camera.Sample) {
 	}
 }
 
-// runPipeline drives HLSWatcher → MPEGTSParser once and broadcasts each
-// emitted sample. It mirrors the wiring that previously lived in every
-// consumer, including the flush-after-chunk that trims ~1s of latency.
+// runPipeline runs the source once and broadcasts each sample.
 func (h *Hub) runPipeline(ctx context.Context) {
 	if h.resumer != nil {
 		h.resumer.ResumeIfStale(ctx)
 	}
+	samples, err := h.source(ctx)
+	if err != nil {
+		h.log.Warn("mediahub: source failed", "source", h.name, "error", err)
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case sample, ok := <-samples:
+			if !ok {
+				return
+			}
+			h.broadcast(sample)
+		}
+	}
+}
 
-	watcher := camera.NewHLSWatcher(h.hlsPath, h.log)
-	parser := camera.NewMPEGTSParser(h.log)
+// hlsSamples drives HLSWatcher → MPEGTSParser, flushing after each chunk,
+// which trims ~1s of latency.
+func hlsSamples(ctx context.Context, path string, logger *slog.Logger) <-chan camera.Sample {
+	watcher := camera.NewHLSWatcher(path, logger)
+	parser := camera.NewMPEGTSParser(logger)
 
 	go func() {
 		if err := watcher.Run(ctx); err != nil && ctx.Err() == nil {
-			h.log.Warn("mediahub: hls watcher exited", "error", err)
+			logger.Warn("mediahub: hls watcher exited", "error", err)
 		}
 	}()
 
@@ -164,26 +205,15 @@ func (h *Hub) runPipeline(ctx context.Context) {
 					return
 				}
 				if _, err := parser.Feed(ctx, chunk); err != nil && ctx.Err() == nil {
-					h.log.Warn("mediahub: mpegts feed error", "error", err)
+					logger.Warn("mediahub: mpegts feed error", "error", err)
 				}
 				// Flush per chunk so the last PES is emitted promptly
 				// instead of waiting for the next chunk (~1s saved).
 				if err := parser.Flush(ctx); err != nil && ctx.Err() == nil {
-					h.log.Warn("mediahub: mpegts flush error", "error", err)
+					logger.Warn("mediahub: mpegts flush error", "error", err)
 				}
 			}
 		}
 	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case sample, ok := <-parser.Samples():
-			if !ok {
-				return
-			}
-			h.broadcast(sample)
-		}
-	}
+	return parser.Samples()
 }

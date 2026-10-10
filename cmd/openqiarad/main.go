@@ -220,16 +220,22 @@ func main() {
 
 	// Shared media pipeline. hlcamd freeze silencieusement après quelques
 	// heures (cf. feedback_hlcamd_freeze_after_hours.md) : le resumer le
-	// réveille à chaque requête vidéo. Le hub décode le flux HLS→H.264 une
-	// seule fois et le fan-out vers HomeKit (SRTP) et RTSP, au lieu que
-	// chaque sortie relise et re-parse les mêmes segments.
+	// réveille à chaque requête vidéo. Le hub lit le flux H.264 une seule
+	// fois et le fan-out vers HomeKit (SRTP) et RTSP : par défaut le 1080p
+	// que hlcamd envoie en multicast local, ou les segments HLS. La vue web
+	// lit toujours les fichiers HLS.
 	// HLSPath par défaut si non configuré : voir homekit_camera.go.
 	hlsPath := cfg.HomeKit.Camera.HLSPath
 	if hlsPath == "" {
 		hlsPath = "/tmp/out_stream/stream/720p/HLS_TEST.m3u8"
 	}
 	hlcamdResumer := camera.NewHlcamdResumer(hlsPath, 10*time.Second, 5*time.Second, logger)
-	mediaHub := mediahub.New(hlsPath, hlcamdResumer, logger)
+	var mediaHub *mediahub.Hub
+	if cfg.HomeKit.Camera.Source == "hls" {
+		mediaHub = mediahub.New(hlsPath, mediahub.HLS(hlsPath, logger), hlcamdResumer, logger)
+	} else {
+		mediaHub = mediahub.New("multicast 1080p", mediahub.Multicast(camera.MulticastVideoMain, logger), hlcamdResumer, logger)
+	}
 
 	// The video pipeline follows the privacy shutter (#50): paused while
 	// closed, at start too. hlcamd starts paused; this replaces the

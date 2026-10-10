@@ -2409,9 +2409,14 @@
           "name": {
             "type": "string"
           },
+          "source": {
+            "type": "string",
+            "enum": ["", "hls"],
+            "description": "Source vidéo de HomeKit et RTSP : vide = flux 1080p de hlcamd en multicast local, `hls` = playlist HLS (`hls_path`)."
+          },
           "hls_path": {
             "type": "string",
-            "description": "Chemin de la playlist HLS servie à HomeKit."
+            "description": "Chemin de la playlist HLS, lue quand `source` vaut `hls`."
           }
         }
       },

@@ -55,13 +55,19 @@ HA découvre aussi le bridge via l'intégration HomeKit Controller (mDNS/Bonjour
 
 ## Streaming caméra
 
-Le flux HomeKit ne passe pas par ffmpeg. Le pipeline est 100% Go :
+Le flux HomeKit ne passe pas par ffmpeg. Le pipeline est 100% Go, partagé avec le serveur RTSP :
+
+```
+hlcamd → multicast 224.0.0.1:9600 (loopback, H.264 1080p) → réassemblage → H.264 RTP → SRTP → iOS
+```
+
+`hlcamd` envoie déjà ce flux à `hls` en multicast local ; openqiarad le lit à côté, sans passer par les segments. Avec `homekit.camera.source: "hls"`, l'ancien chemin reste disponible :
 
 ```
 hls (H.264) → /stream/*.ts → HLS watcher → MPEG-TS parser → H.264 RTP → SRTP → iOS
 ```
 
-Le process `hls` stock est relancé avec `--use-h264` au boot (cf [`../scripts/camera_boot.sh`](../scripts/camera_boot.sh)). Le shutter est ouvert automatiquement à la première demande SRTP.
+La vue web lit toujours les segments HLS. Le process `hls` stock est relancé avec `--use-h264` au boot (cf [`../scripts/camera_boot.sh`](../scripts/camera_boot.sh)).
 
 ## Bibliothèque
 

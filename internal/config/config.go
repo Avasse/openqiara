@@ -182,6 +182,9 @@ type HomeKitConfig struct {
 type HomeKitCameraConfig struct {
 	Enabled bool   `json:"enabled,omitempty"`
 	Name    string `json:"name,omitempty"`
+	// Source feeds HomeKit and RTSP: "" reads hlcamd's 1080p stream on the
+	// loopback multicast, "hls" the HLS playlist at HLSPath (the old way).
+	Source  string `json:"source,omitempty"`
 	HLSPath string `json:"hls_path,omitempty"`
 }
 

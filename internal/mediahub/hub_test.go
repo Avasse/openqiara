@@ -9,7 +9,7 @@ import (
 // newTestHub returns a hub with no pipeline running (subs map ready) so we
 // can exercise broadcast/subscribe/unsubscribe without touching disk.
 func newTestHub() *Hub {
-	return New("/nonexistent.m3u8", nil, nil)
+	return New("test", HLS("/nonexistent.m3u8", nil), nil, nil)
 }
 
 func TestBroadcastFanout(t *testing.T) {
