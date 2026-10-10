@@ -274,11 +274,8 @@ GET /stream/{fichier}
 
 Sert le flux en HLS (MPEG-TS, 1080p + AAC-LC), muxé par openqiarad à la
 demande. `HLS_TEST.m3u8`, à la racine ou sous `720p/`, est la playlist
-principale. `503` si aucune image n'arrive en 10 s (clapet fermé). Avec la
-source `hls`, sert les fichiers du segmenteur du constructeur depuis
-`/tmp/out_stream/stream/`.
+principale. `503` si aucune image n'arrive en 10 s (clapet fermé).
 
-Une requête sur la playlist déclenche un *lazy healing* si elle n'a pas été
-écrite depuis trop longtemps : la requête courante peut échouer, la suivante
-sera servie.
+Si `hlcamd` se fige pendant qu'on regarde, openqiarad le relance de lui-même
+(plus d'image depuis 10 s) : la lecture reprend après quelques secondes.
 

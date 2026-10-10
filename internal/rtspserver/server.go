@@ -24,7 +24,7 @@ import (
 )
 
 // nalType returns the 5-bit H.264 NAL unit type from a NAL unit with no
-// Annex B start code (the form emitted by camera.MPEGTSParser).
+// Annex B start code (camera.Sample's form).
 func nalType(nal []byte) uint8 {
 	if len(nal) == 0 {
 		return 0
@@ -43,9 +43,6 @@ const (
 type Config struct {
 	// Listen is the address the RTSP server binds to, e.g. ":8554".
 	Listen string
-	// HLSPath is the on-disk HLS playlist feeding the pipeline (same
-	// default as the HomeKit camera).
-	HLSPath string
 	// Path is the RTSP stream path, e.g. "openqiara" →
 	// rtsp://host:8554/openqiara.
 	Path string
@@ -97,9 +94,6 @@ func New(cfg Config, hub *mediahub.Hub, logger *slog.Logger) *Server {
 	}
 	if cfg.Path == "" {
 		cfg.Path = "openqiara"
-	}
-	if cfg.HLSPath == "" {
-		cfg.HLSPath = "/tmp/out_stream/stream/720p/HLS_TEST.m3u8"
 	}
 	return &Server{cfg: cfg, hub: hub, log: logger}
 }

@@ -1932,7 +1932,7 @@
         ],
         "summary": "Récupérer un segment vidéo",
         "operationId": "getHLSFile",
-        "description": "Sert le flux en HLS : playlists et segments MPEG-TS (H.264 1080p + AAC-LC), muxés par openqiarad à la demande. `HLS_TEST.m3u8` est la playlist principale ; la première requête attend le premier segment (1 à 2 s). Avec la source `hls`, sert les fichiers du segmenteur du constructeur.\n\n**Chemins imbriqués** : l'URL historique `/stream/720p/HLS_TEST.m3u8` sert le même flux. Un paramètre de chemin OpenAPI ne traverse pas les `/` — construire ces URL en concaténant, sans encoder le séparateur, plutôt qu'en passant le chemin entier comme valeur de `file`.",
+        "description": "Sert le flux en HLS : playlists et segments MPEG-TS (H.264 1080p + AAC-LC), muxés par openqiarad à la demande. `HLS_TEST.m3u8` est la playlist principale ; la première requête attend le premier segment (1 à 2 s).\n\n**Chemins imbriqués** : l'URL historique `/stream/720p/HLS_TEST.m3u8` sert le même flux. Un paramètre de chemin OpenAPI ne traverse pas les `/` — construire ces URL en concaténant, sans encoder le séparateur, plutôt qu'en passant le chemin entier comme valeur de `file`.",
         "parameters": [
           {
             "name": "file",
@@ -2428,15 +2428,6 @@
           },
           "name": {
             "type": "string"
-          },
-          "source": {
-            "type": "string",
-            "enum": ["", "hls"],
-            "description": "Source vidéo de HomeKit et RTSP : vide = flux 1080p de hlcamd en multicast local, `hls` = playlist HLS (`hls_path`)."
-          },
-          "hls_path": {
-            "type": "string",
-            "description": "Chemin de la playlist HLS, lue quand `source` vaut `hls`."
           }
         }
       },

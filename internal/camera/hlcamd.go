@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 	"strings"
 	"sync/atomic"
@@ -19,7 +18,7 @@ import (
 // manière lazy quand quelqu'un regarde (mediahub). En idle, aucun travail.
 type HlcamdResumer struct {
 	// lastFrame tells when the stream last moved: the media hub's last
-	// sample, or the HLS playlist's mtime. Zero: never.
+	// sample. Zero: never.
 	lastFrame func() time.Time
 	maxAge    time.Duration
 	log       *slog.Logger
@@ -49,17 +48,6 @@ func NewHlcamdResumer(lastFrame func() time.Time, maxAge, cooldown time.Duration
 		maxAge:    maxAge,
 		cooldown:  cooldown,
 		log:       logger,
-	}
-}
-
-// PlaylistMtime judges the stream by an HLS playlist, as hls writes it.
-func PlaylistMtime(path string) func() time.Time {
-	return func() time.Time {
-		info, err := os.Stat(path)
-		if err != nil {
-			return time.Time{}
-		}
-		return info.ModTime()
 	}
 }
 

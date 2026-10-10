@@ -318,8 +318,8 @@ dangereux dans [`docs/protocol.md`](docs/protocol.md). Fais des backups.
 ## Remerciements
 
 L'essentiel de cette base de code — le reverse engineering DomusRF, le daemon
-Go, le pipeline de streaming caméra HomeKit (HLS watcher → parser MPEG-TS →
-packetizer RTP H.264 → SRTP) — a été écrit en sessions de pair-programming
+Go, le pipeline de streaming caméra HomeKit (multicast hlcamd → packetizer
+RTP H.264 et AAC-ELD → SRTP) — a été écrit en sessions de pair-programming
 avec [Claude Code](https://www.anthropic.com/claude-code) tournant sur le
 modèle **Claude Opus**. Les décisions d'architecture, la validation sur le
 hardware réel, et les innombrables investigations en cul-de-sac ont été une

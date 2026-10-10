@@ -27,11 +27,6 @@ type CameraConfig struct {
 	// Name shown next to the camera in the iOS Home app. Defaults to
 	// "Caméra OpenQiara" if empty.
 	Name string `json:"name,omitempty"`
-
-	// HLSPath is the on-disk path to the HLS playlist that hlcamd
-	// produces. The streaming pipeline reads NAL units from there.
-	// Defaults to "/tmp/out_stream/stream/720p/HLS_TEST.m3u8".
-	HLSPath string `json:"hls_path,omitempty"`
 }
 
 // HomeKitCamera wraps the HAP camera accessory and tracks streaming
@@ -46,15 +41,8 @@ type HomeKitCamera struct {
 	log *slog.Logger
 	acc *accessory.Camera
 
-	// hlcamdResumer (optionnel) réveille hlcamd via fbxbusctl si la
-	// playlist HLS est stale au moment où iOS ouvre la session live.
-	// nil = pas de healing, on lit ce qui est sur disque.
-	hlcamdResumer *camera.HlcamdResumer
-
-	// hub (optionnel) est le pipeline média partagé. Si non nil, chaque
-	// session s'y abonne au lieu de créer son propre watcher+parser, ce
-	// qui évite de décoder les mêmes segments en double quand RTSP tourne
-	// aussi. nil = fallback historique (watcher+parser dédiés).
+	// hub est le pipeline média partagé (SetMediaHub) : chaque session
+	// s'y abonne. Il réveille hlcamd si son flux s'est figé.
 	hub *mediahub.Hub
 
 	mu       sync.Mutex
@@ -62,15 +50,9 @@ type HomeKitCamera struct {
 }
 
 // SetMediaHub attache le hub média partagé. Doit être appelé avant la
-// première session HK. Si non appelé, la caméra crée son propre pipeline.
+// première session HK : sans lui, pas de flux.
 func (c *HomeKitCamera) SetMediaHub(h *mediahub.Hub) {
 	c.hub = h
-}
-
-// SetHlcamdResumer attache le helper de réveil hlcamd. Doit être appelé
-// avant la première session HK ; safe à appeler une seule fois au boot.
-func (c *HomeKitCamera) SetHlcamdResumer(r *camera.HlcamdResumer) {
-	c.hlcamdResumer = r
 }
 
 // cameraSession tracks the state of a single live-streaming session
@@ -117,9 +99,6 @@ func NewHomeKitCamera(cfg CameraConfig, logger *slog.Logger) *HomeKitCamera {
 	}
 	if cfg.Name == "" {
 		cfg.Name = "Caméra OpenQiara"
-	}
-	if cfg.HLSPath == "" {
-		cfg.HLSPath = "/tmp/out_stream/stream/720p/HLS_TEST.m3u8"
 	}
 
 	cam := &HomeKitCamera{
@@ -362,6 +341,9 @@ func (c *HomeKitCamera) startStreaming(sess *cameraSession, videoPT, audioPT uin
 		c.log.Warn("camera: session already streaming, ignoring start")
 		return nil
 	}
+	if c.hub == nil {
+		return fmt.Errorf("camera: no media hub")
+	}
 	payloadType := videoPT
 	if payloadType == 0 {
 		payloadType = sess.videoPT
@@ -436,67 +418,16 @@ func (c *HomeKitCamera) startStreaming(sess *cameraSession, videoPT, audioPT uin
 		audioSender.RunSilence(ctx)
 	}()
 
-	// Wake hlcamd if the pipeline is stale before consuming chunks.
-	// iOS HK retries fast if the first segments aren't ready, donc le
-	// resume issued here aura le temps de produire avant le 2e fetch.
-	if c.hlcamdResumer != nil {
-		c.hlcamdResumer.ResumeIfStale(ctx)
-	}
+	sub := c.hub.Subscribe()
+	sampleCh := sub.Samples()
+	sess.wg.Add(1)
+	go func() {
+		defer sess.wg.Done()
+		<-ctx.Done()
+		sub.Close()
+	}()
 
-	// Sample source: the shared media hub if wired (one watcher+parser for
-	// all outputs), else a session-private watcher+parser (legacy path,
-	// kept for tests and hub-less builds).
-	var sampleCh <-chan camera.Sample
-	if c.hub != nil {
-		sub := c.hub.Subscribe()
-		sampleCh = sub.Samples()
-		sess.wg.Add(1)
-		go func() {
-			defer sess.wg.Done()
-			<-ctx.Done()
-			sub.Close()
-		}()
-	} else {
-		watcher := camera.NewHLSWatcher(c.cfg.HLSPath, c.log)
-		sess.wg.Add(1)
-		go func() {
-			defer sess.wg.Done()
-			if err := watcher.Run(ctx); err != nil {
-				c.log.Warn("camera: hls watcher exited", "error", err)
-			}
-		}()
-
-		parser := camera.NewMPEGTSParser(c.log)
-		sess.wg.Add(1)
-		go func() {
-			defer sess.wg.Done()
-			defer parser.Close()
-			for {
-				select {
-				case <-ctx.Done():
-					_ = parser.Flush(context.Background())
-					return
-				case chunk, ok := <-watcher.Chunks():
-					if !ok {
-						_ = parser.Flush(context.Background())
-						return
-					}
-					if _, err := parser.Feed(ctx, chunk); err != nil {
-						c.log.Warn("camera: mpegts feed error", "error", err)
-					}
-					// Flush after each chunk so the last PES of the chunk
-					// is emitted promptly instead of waiting for the next
-					// chunk to arrive (~1 second of latency saved).
-					if err := parser.Flush(ctx); err != nil {
-						c.log.Warn("camera: mpegts flush error", "error", err)
-					}
-				}
-			}
-		}()
-		sampleCh = parser.Samples()
-	}
-
-	// Samples → SRTP sender (video only for now; audio is dropped).
+	// Samples → SRTP senders: video NAL by NAL, audio encoded to AAC-ELD.
 	//
 	// We buffer one video sample so we can decide if the CURRENT sample
 	// is the last NAL of its access unit by peeking at the NEXT sample:
@@ -531,12 +462,8 @@ func (c *HomeKitCamera) startStreaming(sess *cameraSession, videoPT, audioPT uin
 					return
 				}
 				if !sample.IsVideo {
-					// The hub's audio is PCM; the private parser's is
-					// AAC, left to the silence pump.
-					if c.hub != nil {
-						if err := audioSender.SendPCM(sample.Data); err != nil {
-							c.log.Debug("srtp audio: send failed", "error", err)
-						}
+					if err := audioSender.SendPCM(sample.Data); err != nil {
+						c.log.Debug("srtp audio: send failed", "error", err)
 					}
 					continue
 				}
@@ -550,8 +477,7 @@ func (c *HomeKitCamera) startStreaming(sess *cameraSession, videoPT, audioPT uin
 	}()
 
 	c.log.Info("camera: streaming pipeline started",
-		"session", base64.StdEncoding.EncodeToString(sess.id),
-		"hls", c.cfg.HLSPath)
+		"session", base64.StdEncoding.EncodeToString(sess.id))
 	return nil
 }
 

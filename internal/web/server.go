@@ -97,7 +97,7 @@ type Server struct {
 	// playlist n'est pas écrite depuis >maxAge). nil = pas de healing,
 	// /api/stream/start fait un resume direct par exec.Command.
 	hlcamd *camera.HlcamdResumer
-	// hls serves /stream/ when set (internal/hlsserver), else hls's files.
+	// hls serves /stream/ (internal/hlsserver).
 	hls http.Handler
 
 	// ota expose les endpoints /api/update/*. nil = endpoints renvoient
@@ -1359,19 +1359,12 @@ func (s *Server) handleStartStream(w http.ResponseWriter, r *http.Request) {
 		s.log.Warn("shutter open failed (continuing)", "error", err)
 	}
 
-	// Activate HLS streams. Si on a un resumer câblé, on passe par lui
-	// (cooldown + log structuré). Sinon fallback exec direct.
+	// Wake hlcamd now (cooldown + log in the resumer): the viewer asked.
 	if s.hlcamd != nil {
 		if err := s.hlcamd.ForceResume(r.Context()); err != nil {
 			// Skipped (cooldown/inflight) n'est pas une erreur fatale —
 			// hlcamd a probablement déjà été réveillé il y a <Xs.
 			s.log.Debug("resume skipped on stream start", "error", err)
-		}
-	} else {
-		cmd := exec.Command("fbxbusctl", "call", "hlcamd", "resume_streams")
-		if err := cmd.Run(); err != nil {
-			writeErr(w, http.StatusInternalServerError, "échec activation flux: "+err.Error())
-			return
 		}
 	}
 	s.log.Info("video stream started")
@@ -1382,45 +1375,13 @@ func (s *Server) handleStartStream(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleHLSStream serves the camera as HLS (internal/hlsserver).
 func (s *Server) handleHLSStream(w http.ResponseWriter, r *http.Request) {
-	if s.hls != nil {
-		s.hls.ServeHTTP(w, r)
+	if s.hls == nil {
+		writeErr(w, http.StatusNotFound, "flux vidéo non configuré")
 		return
 	}
-	const streamRoot = "/tmp/out_stream/stream/"
-	// Whitelist d'extensions + interdiction des composants `..` / chemin
-	// absolu. Limite l'exposition même si Go nettoie déjà côté ServeFile :
-	// on n'autorise QUE les artefacts HLS produits par hlcamd/hls.
-	// Note : un `..` littéral n'arrive jamais jusqu'ici — ServeMux nettoie le
-	// chemin et redirige (307) avant le handler. Ce test reste comme
-	// deuxième barrière si la requête est construite autrement (appel
-	// direct du handler en test, futur routeur sans normalisation).
-	reqPath := r.URL.Path[len("/stream/"):]
-	if reqPath == "" || strings.Contains(reqPath, "..") || strings.HasPrefix(reqPath, "/") {
-		writeErr(w, http.StatusNotFound, "segment HLS introuvable")
-		return
-	}
-	switch {
-	case strings.HasSuffix(reqPath, ".m3u8"):
-		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
-	case strings.HasSuffix(reqPath, ".m4s"), strings.HasSuffix(reqPath, ".ts"):
-		// hlcamd/hls écrit du MPEG-TS dans les .m4s malgré l'extension.
-		w.Header().Set("Content-Type", "video/mp2t")
-	default:
-		writeErr(w, http.StatusNotFound, "extension non servie (.m3u8, .m4s, .ts uniquement)")
-		return
-	}
-
-	// Lazy healing : si la playlist principale n'a pas été touchée depuis
-	// >maxAge, déclencher un resume_streams avant de servir. La requête
-	// courante peut servir 404 si hlcamd n'a pas encore rattrapé, mais
-	// la suivante (iOS HK retry sous 2-5s) sera satisfaite.
-	if s.hlcamd != nil && strings.HasSuffix(reqPath, ".m3u8") {
-		s.hlcamd.ResumeIfStale(r.Context())
-	}
-
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, streamRoot+reqPath)
+	s.hls.ServeHTTP(w, r)
 }
 
 func (s *Server) handleSirenTest(w http.ResponseWriter, r *http.Request) {

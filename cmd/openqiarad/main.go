@@ -219,29 +219,15 @@ func main() {
 		logger.Warn("no MQTT broker configured")
 	}
 
-	// Shared media pipeline. hlcamd freeze silencieusement après quelques
-	// heures (cf. feedback_hlcamd_freeze_after_hours.md) : le resumer le
-	// réveille à chaque requête vidéo. Le hub lit le flux H.264 une seule
-	// fois et le fan-out vers HomeKit (SRTP) et RTSP : par défaut le 1080p
-	// que hlcamd envoie en multicast local (et le micro), ou les segments
-	// de hls. En multicast, openqiarad sert aussi le HLS de la vue web
-	// (internal/hlsserver) : hls ne sert plus à rien.
-	// HLSPath par défaut si non configuré : voir homekit_camera.go.
-	hlsPath := cfg.HomeKit.Camera.HLSPath
-	if hlsPath == "" {
-		hlsPath = "/tmp/out_stream/stream/720p/HLS_TEST.m3u8"
-	}
+	// Shared media pipeline: hlcamd's 1080p stream and microphone, read
+	// once from the loopback multicast and fanned out to HomeKit (SRTP),
+	// RTSP and the HLS of /stream/. hlcamd freezes silently after a few
+	// hours (feedback_hlcamd_freeze_after_hours.md): the resumer wakes it
+	// when the hub's samples stop.
 	var mediaHub *mediahub.Hub
-	var hlcamdResumer *camera.HlcamdResumer
-	var hlsSrv *hlsserver.Server
-	if cfg.HomeKit.Camera.Source == "hls" {
-		hlcamdResumer = camera.NewHlcamdResumer(camera.PlaylistMtime(hlsPath), 10*time.Second, 5*time.Second, logger)
-		mediaHub = mediahub.New(hlsPath, mediahub.HLS(hlsPath, logger), hlcamdResumer, logger)
-	} else {
-		hlcamdResumer = camera.NewHlcamdResumer(func() time.Time { return mediaHub.LastSample() }, 10*time.Second, 5*time.Second, logger)
-		mediaHub = mediahub.New("multicast 1080p + audio", mediahub.Multicast(camera.MulticastVideoMain, camera.MulticastAudio, logger), hlcamdResumer, logger)
-		hlsSrv = hlsserver.New(mediaHub, true, logger)
-	}
+	hlcamdResumer := camera.NewHlcamdResumer(func() time.Time { return mediaHub.LastSample() }, 10*time.Second, 5*time.Second, logger)
+	mediaHub = mediahub.New("multicast 1080p + audio", mediahub.Multicast(camera.MulticastVideoMain, camera.MulticastAudio, logger), hlcamdResumer, logger)
+	hlsSrv := hlsserver.New(mediaHub, true, logger)
 
 	// The video pipeline follows the privacy shutter (#50): paused while
 	// closed, at start too. hlcamd starts paused; this replaces the
@@ -274,7 +260,6 @@ func main() {
 			Camera: publisher.CameraConfig{
 				Enabled: cfg.HomeKit.Camera.Enabled,
 				Name:    cfg.HomeKit.Camera.Name,
-				HLSPath: cfg.HomeKit.Camera.HLSPath,
 			},
 		}, logger)
 		if err := hkPub.Start(ctx, sensors, cmds); err != nil {
@@ -291,19 +276,10 @@ func main() {
 		if listen == "" {
 			listen = ":8554"
 		}
-		rtspHLS := cfg.RTSP.HLSPath
-		if rtspHLS != "" && rtspHLS != hlsPath {
-			// The shared hub decodes a single HLSPath; an RTSP-specific
-			// override can't be honoured without a second pipeline, which
-			// defeats the purpose. Fall back to the shared source.
-			logger.Warn("rtsp: hls_path override ignored, using shared pipeline source",
-				"override", rtspHLS, "shared", hlsPath)
-		}
 		rtspSrv := rtspserver.New(rtspserver.Config{
-			Listen:  listen,
-			Path:    cfg.RTSP.Path,
-			HLSPath: hlsPath,
-			Audio:   cfg.HomeKit.Camera.Source != "hls",
+			Listen: listen,
+			Path:   cfg.RTSP.Path,
+			Audio:  true,
 		}, mediaHub, logger)
 		if err := rtspSrv.Start(ctx); err != nil {
 			logger.Error("failed to start RTSP server", "error", err)
@@ -433,12 +409,9 @@ func main() {
 	// qu'après Start (web UI, caméra HK).
 	if webSrv != nil {
 		webSrv.SetHlcamdResumer(hlcamdResumer)
-		if hlsSrv != nil {
-			webSrv.SetHLS(hlsSrv)
-		}
+		webSrv.SetHLS(hlsSrv)
 	}
 	if hkPub != nil && hkPub.Camera() != nil {
-		hkPub.Camera().SetHlcamdResumer(hlcamdResumer)
 		hkPub.Camera().SetMediaHub(mediaHub)
 	}
 

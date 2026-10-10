@@ -1,13 +1,9 @@
 // Package mediahub fans out the camera's H.264 sample stream to multiple
-// consumers (HomeKit SRTP, RTSP, …) from a single source: hlcamd's 1080p
-// multicast stream, or the HLS→MPEG-TS pipeline.
+// consumers (HomeKit SRTP, RTSP, HLS) from a single source: what hlcamd
+// multicasts on the loopback, its 1080p stream and its microphone.
 //
-// Without it, each output built its own HLSWatcher + MPEGTSParser, so N
-// active outputs meant N disk readers and N MPEG-TS decodes of the very
-// same segments — wasteful on the camera's already-loaded SoC. The Hub
-// runs that pipeline exactly once, on demand: it starts when the first
-// subscriber attaches and stops when the last one leaves, mirroring the
-// per-output on-demand behaviour that used to live in each consumer.
+// The Hub reads the source once, on demand: it starts when the first
+// subscriber attaches and stops when the last one leaves.
 //
 // Fan-out is lossy per subscriber: each subscription has a bounded buffer
 // and drops its oldest samples if that consumer can't keep up, so one slow
@@ -30,7 +26,7 @@ import (
 // the oldest sample is the right call.
 const subBuffer = 32
 
-// Resumer wakes the HLS pipeline (hlcamd) if it has gone stale. HomeKit's
+// Resumer wakes hlcamd if its stream has gone stale. HomeKit's
 // camera path already relies on this before consuming chunks; the Hub does
 // the same so the first subscriber gets frames promptly. nil is fine.
 type Resumer interface {
@@ -43,15 +39,7 @@ type Resumer interface {
 // ends or the source fails.
 type Source func(ctx context.Context) (<-chan camera.Sample, error)
 
-// HLS reads the HLS playlist at path, as hls segments it: video only, its
-// AAC is dropped (the hub's audio is PCM).
-func HLS(path string, logger *slog.Logger) Source {
-	return func(ctx context.Context) (<-chan camera.Sample, error) {
-		return hlsSamples(ctx, path, logger), nil
-	}
-}
-
-// Multicast reads what hlcamd sends hls on the loopback: the H.264 stream
+// Multicast reads what hlcamd multicasts on the loopback: the H.264 stream
 // on videoPort (1080p on camera.MulticastVideoMain) and the microphone's
 // PCM on audioPort.
 func Multicast(videoPort, audioPort int, logger *slog.Logger) Source {
@@ -236,56 +224,4 @@ func (h *Hub) runPipeline(ctx context.Context) {
 			h.broadcast(sample)
 		}
 	}
-}
-
-// hlsSamples drives HLSWatcher → MPEGTSParser, flushing after each chunk,
-// which trims ~1s of latency, and keeps the video.
-func hlsSamples(ctx context.Context, path string, logger *slog.Logger) <-chan camera.Sample {
-	watcher := camera.NewHLSWatcher(path, logger)
-	parser := camera.NewMPEGTSParser(logger)
-
-	go func() {
-		if err := watcher.Run(ctx); err != nil && ctx.Err() == nil {
-			logger.Warn("mediahub: hls watcher exited", "error", err)
-		}
-	}()
-
-	go func() {
-		defer parser.Close()
-		for {
-			select {
-			case <-ctx.Done():
-				_ = parser.Flush(context.Background())
-				return
-			case chunk, ok := <-watcher.Chunks():
-				if !ok {
-					_ = parser.Flush(context.Background())
-					return
-				}
-				if _, err := parser.Feed(ctx, chunk); err != nil && ctx.Err() == nil {
-					logger.Warn("mediahub: mpegts feed error", "error", err)
-				}
-				// Flush per chunk so the last PES is emitted promptly
-				// instead of waiting for the next chunk (~1s saved).
-				if err := parser.Flush(ctx); err != nil && ctx.Err() == nil {
-					logger.Warn("mediahub: mpegts flush error", "error", err)
-				}
-			}
-		}
-	}()
-	video := make(chan camera.Sample)
-	go func() {
-		defer close(video)
-		for s := range parser.Samples() {
-			if !s.IsVideo {
-				continue
-			}
-			select {
-			case video <- s:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return video
 }

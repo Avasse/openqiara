@@ -164,9 +164,6 @@ type RTSPConfig struct {
 	Listen string `json:"listen,omitempty"`
 	// Path is the stream path, default "openqiara".
 	Path string `json:"path,omitempty"`
-	// HLSPath overrides the source HLS playlist; defaults to the same
-	// path the HomeKit camera uses.
-	HLSPath string `json:"hls_path,omitempty"`
 }
 
 // HomeKitConfig holds HomeKit bridge settings.
@@ -182,10 +179,6 @@ type HomeKitConfig struct {
 type HomeKitCameraConfig struct {
 	Enabled bool   `json:"enabled,omitempty"`
 	Name    string `json:"name,omitempty"`
-	// Source feeds HomeKit and RTSP: "" reads hlcamd's 1080p stream on the
-	// loopback multicast, "hls" the HLS playlist at HLSPath (the old way).
-	Source  string `json:"source,omitempty"`
-	HLSPath string `json:"hls_path,omitempty"`
 }
 
 // MQTTConfig holds MQTT broker connection settings.
