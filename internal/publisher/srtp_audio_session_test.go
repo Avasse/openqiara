@@ -14,7 +14,7 @@ func TestSendPCMFramesAAC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ios.Close()
+	defer func() { _ = ios.Close() }()
 	key, salt := bytes.Repeat([]byte{1}, 16), bytes.Repeat([]byte{2}, 14)
 	port := uint16(ios.LocalAddr().(*net.UDPAddr).Port)
 	s, err := newSRTPAudioSender(net.IPv4(127, 0, 0, 1), port, key, salt, key, salt, 1, 110,
@@ -22,7 +22,7 @@ func TestSendPCMFramesAAC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	if s.enc == nil {
 		t.Skip("libfdk-aac absent: the camera has it")
 	}

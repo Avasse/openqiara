@@ -329,7 +329,7 @@ func (e *Engine) HandleSensorEvent(sensorID int, sensorType string, inAlarm bool
 
 // watchedLocked tells whether a sensor sets the alarm off in its mode.
 func (e *Engine) watchedLocked(sensorID int) bool {
-	return !(e.mode == StateArmedNight && e.configFor(sensorID).NightAllowed)
+	return e.mode != StateArmedNight || !e.configFor(sensorID).NightAllowed
 }
 
 // sensorAlarmLocked moves the alarm on for a sensor in alarm: the entry

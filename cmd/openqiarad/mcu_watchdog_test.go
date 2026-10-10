@@ -18,7 +18,7 @@ func TestMCUWatchdogFeeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer mcu.Close()
+	defer func() { _ = mcu.Close() }()
 
 	var healthy atomic.Bool
 	healthy.Store(true)

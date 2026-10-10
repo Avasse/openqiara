@@ -87,7 +87,7 @@ func (w *mcuWatchdog) run(ctx context.Context) {
 		w.logger.Error("watchdog: cannot hold the MCU's watchdog port, the camera will restart", "error", err)
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	w.logger.Info("watchdog: feeding the MCU's watchdog", "every", w.every)
 	if w.tookOver != nil {
 		w.tookOver()
