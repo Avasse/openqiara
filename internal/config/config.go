@@ -34,6 +34,10 @@ type Config struct {
 	// mode). It only grows, like fbxhome's domus_next_addr: the MCU has no
 	// way to forget a sensor, so an address is never given twice.
 	RadioNextAddr uint32 `json:"radio_next_addr,omitempty"`
+
+	// ShutterClosed is the privacy shutter as last set: closed, hlcamd's
+	// streams stay paused, at start too.
+	ShutterClosed bool `json:"shutter_closed,omitempty"`
 }
 
 // WebConfig holds web UI settings.

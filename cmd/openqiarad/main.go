@@ -231,6 +231,25 @@ func main() {
 	hlcamdResumer := camera.NewHlcamdResumer(hlsPath, 10*time.Second, 5*time.Second, logger)
 	mediaHub := mediahub.New(hlsPath, hlcamdResumer, logger)
 
+	// The video pipeline follows the privacy shutter (#50): paused while
+	// closed, at start too. hlcamd starts paused; this replaces the
+	// resume_streams boot.sh sent.
+	if rc, ok := cam.(*camera.RadioClient); ok {
+		rc.OnShutter = func(ctx context.Context, open bool) {
+			if err := store.Update(func(c *config.Config) { c.ShutterClosed = !open }); err != nil {
+				logger.Warn("shutter state not saved", "error", err)
+			}
+			hlcamdResumer.Shutter(ctx, open)
+		}
+	}
+	go func() {
+		select {
+		case <-time.After(10 * time.Second): // hlcamd registers on fbxbus
+			hlcamdResumer.Shutter(ctx, !store.Get().ShutterClosed)
+		case <-ctx.Done():
+		}
+	}()
+
 	// HomeKit publisher
 	var hkPub *publisher.HomeKitPublisher
 	if cfg.HomeKit.Enabled {

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -30,6 +31,9 @@ type HlcamdResumer struct {
 	inflight atomic.Bool
 	lastCall atomic.Int64 // unix nanos
 	cooldown time.Duration
+
+	// closed is the privacy shutter: closed, the streams stay paused.
+	closed atomic.Bool
 }
 
 // NewHlcamdResumer returns a resumer for the given HLS playlist path.
@@ -56,6 +60,9 @@ func NewHlcamdResumer(playlistPath string, maxAge, cooldown time.Duration, logge
 // HLS — si hlcamd ne revient pas, le client video verra un 404/timeout
 // par le chemin normal.
 func (r *HlcamdResumer) ResumeIfStale(ctx context.Context) bool {
+	if r.closed.Load() {
+		return false // paused on purpose: shutter closed
+	}
 	info, err := os.Stat(r.playlistPath)
 	if err != nil {
 		// Pas de playlist du tout = hlcamd n'a pas (encore) démarré
@@ -73,6 +80,9 @@ func (r *HlcamdResumer) ResumeIfStale(ctx context.Context) bool {
 // ForceResume issues a resume regardless of staleness. Used by the
 // explicit /api/stream/start path where the user signals video intent.
 func (r *HlcamdResumer) ForceResume(ctx context.Context) error {
+	if r.closed.Load() {
+		return fmt.Errorf("resume_streams skipped: shutter closed")
+	}
 	if !r.callResume(ctx, "forced") {
 		return fmt.Errorf("resume_streams skipped (cooldown or inflight)")
 	}
@@ -101,4 +111,33 @@ func (r *HlcamdResumer) callResume(ctx context.Context, reason string) bool {
 	}
 	r.log.Info("hlcamd resume_streams issued", "reason", reason)
 	return true
+}
+
+// Shutter follows the privacy shutter: closed, hlcamd's streams are paused,
+// its vision analysis with them (about 85 % of a core down to 5 %, measured
+// 2026-10-10, #50), and nothing resumes them until it opens. hlcamd stays
+// alive for watchdog_mcu. Also called at start: hlcamd starts paused, and
+// may not be on fbxbus yet, hence the retries.
+func (r *HlcamdResumer) Shutter(ctx context.Context, open bool) {
+	r.closed.Store(!open)
+	method := "resume_streams"
+	if !open {
+		method = "pause_streams"
+	}
+	for try := 1; ; try++ {
+		out, err := exec.CommandContext(ctx, "fbxbusctl", "call", "hlcamd", method).CombinedOutput()
+		if err == nil {
+			r.log.Info("hlcamd "+method+" issued", "reason", "shutter")
+			return
+		}
+		if try == 6 || ctx.Err() != nil {
+			r.log.Warn("hlcamd "+method+" failed", "error", err, "output", strings.TrimSpace(string(out)))
+			return
+		}
+		select {
+		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
+			return
+		}
+	}
 }

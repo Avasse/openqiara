@@ -255,9 +255,8 @@ fi
     done
 ) &
 
-# Resume hlcamd video streams in the background. hlcamd starts paused
-# and needs time to register on fbxbus before resume_streams works.
-(sleep 10; fbxbusctl call hlcamd resume_streams 2>/dev/null) &
+# hlcamd starts paused: openqiarad resumes its streams, or keeps them
+# paused while the privacy shutter is closed.
 
 # Watchdog: hlsystem can respawn and relaunch hls-720p/360p/1080p in H.265,
 # which conflicts with our H.264 pipeline, and fbxhome would take the radio

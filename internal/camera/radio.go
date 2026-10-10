@@ -43,6 +43,10 @@ type RadioClient struct {
 	BytecodeDir string // <bytecode hash>.bin
 	FbxhomeXML  string // glob of fbxhome's state files, imported once
 
+	// OnShutter is called once the shutter moved (the video pipeline
+	// follows it).
+	OnShutter func(ctx context.Context, open bool)
+
 	keys    []domus.VendorKey // set by Connect
 	gateway uint32            // set by Connect
 	events  chan SensorEvent
@@ -979,6 +983,9 @@ func (c *RadioClient) SetShutter(ctx context.Context, open bool) error {
 	settings := fmt.Sprintf(`{"parameters":{"config.sensor.night_day_mode":{"val":%d}}}`, mode)
 	if out, err := exec.CommandContext(ctx, "fbxbusctl", "set", "hlcamd", "video_settings", settings).CombinedOutput(); err != nil {
 		return fmt.Errorf("radio: hlcamd night mode: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	if c.OnShutter != nil {
+		c.OnShutter(ctx, open)
 	}
 	return nil
 }
