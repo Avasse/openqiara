@@ -390,15 +390,14 @@ func main() {
 
 	// hl_event_collectd → MQTT dispatcher (IntelliVision detections).
 	//
-	// Quand on intercepte les POST /events et /notifications du daemon
-	// vendor `hl_event_collectd` (cf. internal/web/server.go), on récupère
-	// les events IV (human/pet detection) — on les transforme en états
-	// binary_sensor MQTT pour Home Assistant.
+	// hlcamd remet ses détections IV (human/pet) à hl_event_collectd sur
+	// fbxbus, nom qu'openqiarad tient (event_collector.go) : on les
+	// transforme en états binary_sensor MQTT pour Home Assistant.
 	//
 	// Le dispatcher maintient un état par object_id avec auto-expire après
 	// 30s sans Exit/Lost (au cas où la cam perd l'objet en cours). Le sink
 	// reçoit chaque transition et publie sur MQTT.
-	if webSrv != nil && mqttPub != nil {
+	if mqttPub != nil {
 		// Publish discovery une fois (HA va auto-créer les entités).
 		if err := mqttPub.HAPublisher().PublishIVDiscovery(ctx); err != nil {
 			logger.Warn("mqtt: publish IV discovery failed", "error", err)
@@ -426,8 +425,6 @@ func main() {
 			}
 		}, 30*time.Second)
 
-		webSrv.SetHLEventsDispatcher(ivDispatcher)
-		logger.Info("hl_event_collectd dispatcher attached", "iv_kinds", []string{"human", "pet"})
 		go serveEventCollector(ctx, ivDispatcher, logger)
 	}
 

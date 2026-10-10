@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"os/exec"
 	"strings"
@@ -15,8 +14,7 @@ import (
 // serveEventCollector takes hl_event_collectd's place on fbxbus: hlcamd
 // calls it with its detections (new_notification, iv_event) and the IR-cut
 // switches (new_event, flip_flop). The vendor's daemon queued them for the
-// dead cloud; dnsmasq sent its POSTs back to openqiarad (/notifications),
-// still served for now.
+// dead cloud.
 //
 // The vendor's daemon must stop first: hlcamd talks to it directly (p2p)
 // as long as it lives, even once the name is ours.
@@ -42,8 +40,8 @@ func serveEventCollector(ctx context.Context, d *hlevents.Dispatcher, logger *sl
 		Log:  logger,
 		Methods: map[string]fbxbus.Handler{
 			"new_notification": func(arg string) {
-				var n hlevents.Notification
-				if err := json.Unmarshal([]byte(arg), &n); err != nil {
+				n, err := hlevents.ParseNotification(arg)
+				if err != nil {
 					logger.Warn("fbxbus: bad notification", "error", err)
 					return
 				}

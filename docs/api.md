@@ -43,9 +43,6 @@ $ curl -s http://camera/api/v1/typo
 {"error":"route inconnue","path":"/api/v1/typo","method":"GET","see":"docs/api.md"}
 ```
 
-Deux exceptions volontaires, **hors versionnage et hors contrat** :
-`POST /events` et `POST /notifications` (cf. [Webhooks internes](#webhooks-internes)).
-
 ## Authentification
 
 HTTP Basic, utilisateur fixe `admin`, mot de passe défini via
@@ -57,8 +54,7 @@ les commandes qui pilotent le matériel.
 $ curl -u admin:motdepasse http://camera/api/v1/status
 ```
 
-L'auth couvre tout le serveur, catch-all `410` compris. Seuls les webhooks
-loopback y échappent (et uniquement depuis `127.0.0.1`/`::1`).
+L'auth couvre tout le serveur, catch-all `410` compris.
 
 ## Ressources et commandes
 
@@ -286,30 +282,3 @@ Une requête sur la playlist déclenche un *lazy healing* si elle n'a pas été
 écrite depuis trop longtemps : la requête courante peut échouer, la suivante
 sera servie.
 
----
-
-## Webhooks internes
-
-```
-POST /events
-POST /notifications
-```
-
-**Hors contrat, hors versionnage, ne pas appeler.** Ces routes existent pour
-`hl_event_collectd`, le collecteur vendor qui croit pousser vers le cloud
-Free : le DNS local résout `*.srv.home-labs.fr` vers `127.0.0.1`.
-
-Trois propriétés à ne pas casser :
-
-- **Loopback strict** — refusées en `403` depuis toute autre adresse, y
-  compris quand l'authentification est désactivée.
-- **Toujours `200`** — même sur un corps illisible. Un autre code met le
-  collecteur en file de retry et **bloque tous les events suivants**.
-- **`Server: nginx/1.14.2` et `{"result":"ok"}`** — la réponse imite le
-  cloud Free. Ce header n'est pas un résidu : le retirer fait échouer la
-  livraison.
-
-Depuis que openqiarad tient lui-même le nom `hl_event_collectd` sur fbxbus
-(`internal/fbxbus`), hlcamd lui remet ses détections IntelliVision
-directement et le collecteur vendor ne tourne plus : ces routes ne servent
-plus qu'en transition, et seront retirées.

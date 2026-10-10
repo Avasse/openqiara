@@ -135,11 +135,9 @@ rm -f /data/fbxhome.log /data/fbxhome.log.old
 # 1. Bind to :53 only (NOT :5353): the stock dnsmasq grabs :5353 too, which
 #    collides with our HomeKit mDNS responder.
 # 2. Force *.srv.home-labs.fr → 127.0.0.1 and ::1 (loopback) instead of
-#    routing to the now-dead Free cloud over IPv6. Without this, the
-#    vendor daemon `hl_event_collectd` POSTs sensor events / IV detection
-#    notifications to the cloud and they vanish — openqiarad never sees
-#    them. With it, those POSTs land on our /events and /notifications
-#    handlers and feed the IV → MQTT pipeline.
+#    routing to the now-dead Free cloud over IPv6: what vendor code still
+#    calls it (hlcamd's IntelliVision licence check, should
+#    /data/iv_license go) stays on the camera.
 fbxupstartctl stop dnsmasq 2>/dev/null
 killall dnsmasq 2>/dev/null
 sleep 2

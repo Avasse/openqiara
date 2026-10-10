@@ -55,7 +55,7 @@ func NewDispatcher(logger *slog.Logger, sink DetectionSink, exitTimeout time.Dur
 	}
 }
 
-// HandleNotification traite une notification reçue depuis le push HTTP.
+// HandleNotification traite une notification reçue de hlcamd.
 // Seules les notifs de type iv_event sont traitées aujourd'hui ; les
 // autres types sont loggués au niveau debug pour qu'on puisse les exposer
 // plus tard si besoin.
@@ -67,15 +67,6 @@ func (d *Dispatcher) HandleNotification(_ context.Context, item NotificationItem
 		d.logger.Debug("hlevents: unknown notif type",
 			"type", item.Notif.Type, "ts", item.Timestamp)
 	}
-}
-
-// HandleEvent traite un event /events. Pour l'instant on ne fait que
-// logger — les events sensor viennent du moteur radio. À étendre si on veut consommer shutter_open/close
-// d'ici plutôt qu'ailleurs.
-func (d *Dispatcher) HandleEvent(_ context.Context, item EventItem) {
-	d.logger.Debug("hlevents: /events item",
-		"type", item.Event.Type, "ts", item.Timestamp,
-		"item_id", item.Event.ItemID, "node_type", item.Event.NodeTy)
 }
 
 // handleIV met à jour l'état interne pour chaque event + chaque object.

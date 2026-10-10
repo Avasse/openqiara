@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/caligone/openqiara/internal/camera"
 	"github.com/caligone/openqiara/internal/config"
-	"github.com/caligone/openqiara/internal/hlevents"
 	"github.com/caligone/openqiara/internal/mqtt"
 	"github.com/caligone/openqiara/internal/ota"
 )
@@ -95,11 +93,6 @@ type Server struct {
 	// peuvent brick le MCU (opcodes 0x03, 0x08) ou stresser un capteur.
 	debugEnabled bool
 
-	// hlDispatcher route les events /events et notifs /notifications
-	// (poussés par hl_event_collectd, le proxy cloud Free) vers les
-	// publishers MQTT/HK. nil = on log seulement, pas de dispatch.
-	hlDispatcher *hlevents.Dispatcher
-
 	// hlcamd permet le lazy healing du pipeline HLS (resume_streams si la
 	// playlist n'est pas écrite depuis >maxAge). nil = pas de healing,
 	// /api/stream/start fait un resume direct par exec.Command.
@@ -149,13 +142,6 @@ func NewServer(cam camera.Client, store *config.Store, mqttOK func() bool, mqttC
 // À n'activer qu'en développement.
 func (s *Server) EnableDebugEndpoints() {
 	s.debugEnabled = true
-}
-
-// SetHLEventsDispatcher attache le dispatcher qui consomme les events
-// /events et /notifications poussés par hl_event_collectd. Si non
-// appelé, les bodies sont juste loggués sans traitement.
-func (s *Server) SetHLEventsDispatcher(d *hlevents.Dispatcher) {
-	s.hlDispatcher = d
 }
 
 // SetHlcamdResumer attache le helper de lazy healing du pipeline HLS.
@@ -297,18 +283,6 @@ func (s *Server) routes() (*http.ServeMux, error) {
 	mux.HandleFunc("GET /api/v1/events", s.cors(s.handleEvents))
 	mux.HandleFunc("GET /stream/", s.cors(s.handleHLSStream))
 
-	// Push depuis hl_event_collectd (intercepte les webhooks cloud Free).
-	// Le DNS local résout *.srv.home-labs.fr → 127.0.0.1 ; le collectd
-	// pousse les events sur /events (sensor events, alarm transitions,
-	// shutter, etc.) et les notifications sur /notifications (IV events
-	// type human/pet detection). On accepte les POST sans auth — le
-	// hostname EUPID.srv.home-labs.fr résolu localement suffit comme garde.
-	//
-	// Si on répond autre chose que 200, hl_event_collectd met les events
-	// en queue retry et ne pousse plus rien d'autre tant que la queue n'est
-	// pas vidée — il faut donc handler les DEUX routes en 200 OK.
-	mux.HandleFunc("POST /events", s.handleHLEventPush)
-	mux.HandleFunc("POST /notifications", s.handleHLEventPush)
 	// CORS preflight
 	mux.HandleFunc("OPTIONS /api/", s.handleOptions)
 
@@ -453,20 +427,6 @@ func (s *Server) basicAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Allow hl_event_collectd push without auth — mais STRICTEMENT depuis loopback.
-		// hl_event_collectd tourne sur la caméra elle-même et résout
-		// *.srv.home-labs.fr → 127.0.0.1 via dnsmasq local. Tout autre
-		// peer qui POST sur /events ou /notifications est suspect (LAN
-		// inconnu qui essaie d'injecter des events capteur ou IV).
-		if r.Method == http.MethodPost && (r.URL.Path == "/events" || r.URL.Path == "/notifications") {
-			if isLoopbackRequest(r) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			http.Error(w, "loopback only", http.StatusForbidden)
-			return
-		}
-
 		user, pass, ok := r.BasicAuth()
 		if !ok || user != "admin" || !cfg.Admin.CheckPassword(pass) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="OpenQiara"`)
@@ -482,21 +442,6 @@ func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// isLoopbackRequest tells whether the request was issued from 127.0.0.0/8
-// or ::1. r.RemoteAddr is the socket peer ; on n'a pas de proxy devant
-// openqiarad donc pas besoin de gérer X-Forwarded-For.
-func isLoopbackRequest(r *http.Request) bool {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
-	}
-	return ip.IsLoopback()
 }
 
 // --- Handlers ---
@@ -1633,70 +1578,6 @@ func (s *Server) handleDebugSirenSeq(w http.ResponseWriter, r *http.Request) {
 		"addr", body.Addr, "payload", body.Payload,
 		"handshake", withHandshake, "stop", withStop, "hold_ms", holdMs)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-}
-
-// maxHLEventPushBody protège contre un client malveillant qui enverrait un
-// body énorme. 64 KiB suffit largement pour la JSON de notifications.
-const maxHLEventPushBody = 64 << 10
-
-// handleHLEventPush reçoit les events push de hl_event_collectd qui pense
-// envoyer au cloud Free. La réponse mime celle du cloud ({"result":"ok"})
-// pour qu'il considère la livraison comme réussie et ne retry pas.
-//
-// Deux routes câblées sur ce handler :
-//
-//   - POST /events        → body {"events":[{ts,ev:{type,...}}]}
-//   - POST /notifications → body {"notifications":[{ts,notif:{type,data}}]}
-//
-// Les events IV (IntelliVision: détection humain/pet) arrivent sur
-// /notifications avec type "iv_event". Les events sensor/alarm/shutter
-// arrivent sur /events. Pour l'instant on les loggue tous, et on dispatch
-// les iv_event vers s.ivDispatcher si attaché.
-//
-// CRITIQUE : doit répondre 200 sur les DEUX routes, sinon hl_event_collectd
-// met sa queue en retry et ne flush plus rien — on aurait des events qui
-// sortent au compte-gouttes.
-func (s *Server) handleHLEventPush(w http.ResponseWriter, r *http.Request) {
-	defer func() { _ = r.Body.Close() }()
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxHLEventPushBody))
-	if err != nil {
-		s.log.Warn("hl_event push: read body failed", "err", err)
-		// On répond OK quand même pour ne pas faire retry l'expéditeur — le
-		// body partiel est dans `body`, ce qui est mieux que rien.
-	}
-
-	s.log.Info("hl_event push received",
-		"host", r.Host,
-		"path", r.URL.Path,
-		"content_type", r.Header.Get("Content-Type"),
-		"body_len", len(body),
-		"body", string(body),
-	)
-
-	// Dispatch selon le path. Pas de fail-fast sur les erreurs de parse :
-	// on veut TOUJOURS répondre 200 pour que la queue se vide.
-	switch r.URL.Path {
-	case "/events":
-		if env, perr := hlevents.ParseEvents(body); perr == nil && s.hlDispatcher != nil {
-			for _, item := range env.Events {
-				s.hlDispatcher.HandleEvent(r.Context(), item)
-			}
-		}
-	case "/notifications":
-		if env, perr := hlevents.ParseNotifications(body); perr == nil && s.hlDispatcher != nil {
-			for _, item := range env.Notifications {
-				s.hlDispatcher.HandleNotification(r.Context(), item)
-			}
-		}
-	}
-
-	// Mime la réponse cloud Free pour que hl_event_collectd flush sa queue.
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Server", "nginx/1.14.2")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(`{"result":"ok"}`)); err != nil {
-		s.log.Debug("hl_event push: response write failed", "err", err)
-	}
 }
 
 func (s *Server) handleReboot(w http.ResponseWriter, r *http.Request) {
